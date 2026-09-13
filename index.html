@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>金門風獅爺巡禮尋訪地圖 (全 30 站)</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, "Noto Sans TC", sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: #f8fafc; color: #0f172a; }
+    header { background: linear-gradient(135deg, #1e3a8a, #2563eb); color: white; padding: 10px 18px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 1000; }
+    header h1 { font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .header-actions { display: flex; gap: 8px; align-items: center; }
+    .btn { background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s; }
+    .btn:hover { background: rgba(255,255,255,0.3); }
+    .btn-primary { background: #f59e0b; border-color: #d97706; color: #0f172a; font-weight: 600; }
+    .btn-primary:hover { background: #d97706; color: white; }
+    .main-container { display: flex; flex: 1; height: calc(100vh - 52px); position: relative; }
+    #map { flex: 1; height: 100%; z-index: 1; }
+    #sidebar { width: 390px; background: white; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; height: 100%; z-index: 10; box-shadow: -2px 0 6px rgba(0,0,0,0.05); }
+    .filter-bar { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; background: #f1f5f9; display: flex; gap: 5px; flex-wrap: wrap; }
+    .filter-btn { padding: 3px 8px; border-radius: 12px; border: 1px solid #cbd5e1; background: white; font-size: 0.75rem; cursor: pointer; color: #475569; transition: all 0.2s; }
+    .filter-btn.active { background: #2563eb; color: white; border-color: #2563eb; font-weight: 600; }
+    .stats-bar { padding: 6px 12px; font-size: 0.78rem; color: #64748b; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; }
+    .list-container { flex: 1; overflow-y: auto; padding: 10px; }
+    .stop-card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s; position: relative; display: flex; gap: 10px; }
+    .stop-card:hover { border-color: #3b82f6; box-shadow: 0 2px 8px rgba(59,130,246,0.15); transform: translateY(-1px); }
+    .stop-card.active { border-color: #2563eb; background: #eff6ff; }
+    .stop-num-badge { background: #2563eb; color: white; font-size: 0.8rem; font-weight: 700; width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .stop-thumb-box { width: 70px; height: 70px; border-radius: 6px; overflow: hidden; background: #e2e8f0; flex-shrink: 0; position: relative; }
+    .stop-thumb { width: 100%; height: 100%; object-fit: cover; }
+    .stop-photo-count { position: absolute; bottom: 2px; right: 2px; background: rgba(0,0,0,0.65); color: white; font-size: 0.65rem; padding: 1px 4px; border-radius: 3px; }
+    .stop-details { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+    .stop-name { font-size: 0.9rem; font-weight: 700; color: #0f172a; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stop-time { font-size: 0.75rem; color: #64748b; margin-bottom: 2px; }
+    .stop-loc { font-size: 0.74rem; color: #0284c7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .badge-status { display: inline-block; padding: 1px 5px; border-radius: 4px; font-size: 0.68rem; font-weight: 600; }
+    .status-pinned { background: #dcfce7; color: #15803d; }
+    .status-wait { background: #fef3c7; color: #b45309; }
+
+    /* 帶有站點數字的旗標 */
+    .numbered-pin {
+      background-color: #2563eb; color: white; border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg); width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.35); border: 2px solid white;
+      font-size: 11px; font-weight: 800; text-align: center;
+    }
+    .pin-label { transform: rotate(45deg); }
+
+    /* 旗標展開彈窗 */
+    .popup-box { width: 280px; font-family: inherit; }
+    .popup-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+    .popup-title { font-size: 0.95rem; font-weight: 700; color: #1e3a8a; }
+    .popup-badge { background: #dbeafe; color: #1d4ed8; font-size: 0.7rem; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
+    .popup-meta { font-size: 0.75rem; color: #475569; margin-bottom: 6px; }
+    .popup-meta i { width: 14px; text-align: center; color: #64748b; }
+    .popup-gallery { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0; margin-bottom: 8px; }
+    .gallery-img { width: 75px; height: 55px; object-fit: cover; border-radius: 4px; border: 1px solid #cbd5e1; cursor: pointer; }
+    .popup-main-img { width: 100%; height: 165px; object-fit: cover; border-radius: 6px; margin-bottom: 6px; }
+    .popup-actions { display: flex; gap: 6px; }
+    .popup-link { flex: 1; text-align: center; padding: 4px 6px; background: #2563eb; color: white; text-decoration: none; border-radius: 4px; font-size: 0.72rem; font-weight: 600; }
+    .drop-overlay { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(37,99,235,0.88); color: white; z-index: 9999; justify-content: center; align-items: center; flex-direction: column; gap: 12px; font-size: 1.15rem; font-weight: 600; }
+    @media (max-width: 768px) { .main-container { flex-direction: column; } #sidebar { width: 100%; height: 45%; } #map { height: 55%; } }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1><i class="fa-solid fa-flag"></i> 金門風獅爺巡禮尋訪地圖 (全 30 站・60 件影像)</h1>
+    <div class="header-actions">
+      <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none;" onchange="handleFiles(this.files)">
+      <button class="btn btn-primary" onclick="document.getElementById('folderInput').click()">
+        <i class="fa-solid fa-folder-open"></i> 匯入照片自動定位 GPS
+      </button>
+      <button class="btn" onclick="exportGeoJSON()"><i class="fa-solid fa-download"></i> 匯出 GeoJSON</button>
+    </div>
+  </header>
+
+  <div class="main-container" id="dropArea">
+    <div id="map"></div>
+    <div id="sidebar">
+      <div class="filter-bar">
+        <button class="filter-btn active" onclick="setFilter('ALL')">全部 (30 站)</button>
+        <button class="filter-btn" onclick="setFilter('2026-09-10')">9/10 (1 站)</button>
+        <button class="filter-btn" onclick="setFilter('2026-09-11')">9/11 (15 站)</button>
+        <button class="filter-btn" onclick="setFilter('2026-09-12')">9/12 (13 站)</button>
+        <button class="filter-btn" onclick="setFilter('2026-09-13')">9/13 (1 站)</button>
+      </div>
+      <div class="stats-bar">
+        <span>已定位地標：<strong id="pinned-count" style="color:#16a34a;">1</strong> / 30 站</span>
+        <span>總相片紀錄：60 件</span>
+      </div>
+      <div class="list-container" id="stopsList"></div>
+    </div>
+
+    <div class="drop-overlay" id="dropOverlay">
+      <i class="fa-solid fa-cloud-arrow-up fa-3x"></i>
+      <p>放開滑鼠即可自動讀取每張照片 EXIF GPS，自動整合各站風獅爺旗標！</p>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // 30 個風獅爺整合站點資料
+    const stopsData = [
+      {
+        stop_id: 1, stop_number: "#01", name: "下埔下風獅爺", date: "2026-09-10", time_display: "18:06:51",
+        lat: 24.4436804, lng: 118.3087024, location: "金寧鄉下埔下 / 慈湖路一段", photo_count: 1,
+        photos: [{ id: "1RHvt8kPY2FtRDeQSP1zVTljR0KaowXW6", title: "20260910_180651.jpg", time: "18:06:51", viewUrl: "https://drive.google.com/file/d/1RHvt8kPY2FtRDeQSP1zVTljR0KaowXW6/view?usp=drivesdk" }]
+      },
+      {
+        stop_id: 2, stop_number: "#02", name: "第 02 站風獅爺", date: "2026-09-11", time_display: "09:55:59 ~ 09:56:21",
+        location: "金門巡禮景點", photo_count: 2,
+        photos: [
+          { id: "1dWroticymlvqAzHPt69hFIKVgYmhhiAB", title: "20260911_095559.jpg", time: "09:55:59", viewUrl: "https://drive.google.com/file/d/1dWroticymlvqAzHPt69hFIKVgYmhhiAB/view?usp=drivesdk" },
+          { id: "1D-UKo00XAQvFG4es_PUvqUgJcGbNlcuZ", title: "20260911_095621.jpg", time: "09:56:21", viewUrl: "https://drive.google.com/file/d/1D-UKo00XAQvFG4es_PUvqUgJcGbNlcuZ/view?usp=drivesdk" }
+        ]
+      },
+      {
+        stop_id: 3, stop_number: "#03", name: "第 03 站風獅爺", date: "2026-09-11", time_display: "10:14:11 ~ 10:14:20",
+        location: "金門巡禮景點", photo_count: 2,
+        photos: [
+          { id: "1DFekR4HFtCFbumWPsxEHvSpQdup7uqkS", title: "20260911_101411.jpg", time: "10:14:11", viewUrl: "https://drive.google.com/file/d/1DFekR4HFtCFbumWPsxEHvSpQdup7uqkS/view?usp=drivesdk" },
+          { id: "1Iv6dUlATv4fl5pBZGe7M2bPx3PdyD-vi", title: "20260911_101420.jpg", time: "10:14:20", viewUrl: "https://drive.google.com/file/d/1Iv6dUlATv4fl5pBZGe7M2bPx3PdyD-vi/view?usp=drivesdk" }
+        ]
+      },
+      {
+        stop_id: 4, stop_number: "#04", name: "第 04 站風獅爺", date: "2026-09-11", time_display: "14:11:13 ~ 14:11:15",
+        location: "金門巡禮景點", photo_count: 2,
+        photos: [
+          { id: "1L5suGbNaYMKIfL7U7tSMXBcpfCIk5ffD", title: "20260911_141113.jpg", time: "14:11:13", viewUrl: "https://drive.google.com/file/d/1L5suGbNaYMKIfL7U7tSMXBcpfCIk5ffD/view?usp=drivesdk" },
+          { id: "1DDW4okdayo11I1edB7SWp60uUV4Tz7IR", title: "20260911_141115.jpg", time: "14:11:15", viewUrl: "https://drive.google.com/file/d/1DDW4okdayo11I1edB7SWp60uUV4Tz7IR/view?usp=drivesdk" }
+        ]
+      },
+      {
+        stop_id: 5, stop_number: "#05", name: "第 05 站風獅爺", date: "2026-09-11", time_display: "14:22:02 ~ 14:24:25",
+        location: "金門巡禮景點", photo_count: 2,
+        photos: [
+          { id: "11_3YJIULvkMKySznIQfsZYJx0Z9j9snM", title: "20260911_142202.jpg", time: "14:22:02", viewUrl: "https://drive.google.com/file/d/11_3YJIULvkMKySznIQfsZYJx0Z9j9snM/view?usp=drivesdk" },
+          { id: "1im0zVF4IdSgf32afp5RPJ867QwhoDR-u", title: "20260911_142425.jpg", time: "14:24:25", viewUrl: "https://drive.google.com/file/d/1im0zVF4IdSgf32afp5RPJ867QwhoDR-u/view?usp=drivesdk" }
+        ]
+      },
+      {
+        stop_id: 6, stop_number: "#06", name: "第 06 站風獅爺", date: "2026-09-11", time_display: "15:58:11 ~ 15:59:41",
+        location: "金門巡禮景點", photo_count: 3,
+        photos: [
+          { id: "1Ifcefv_jTvrK0YoBzszX29JpuvP2GbEQ", title: "20260911_155811.mp4", time: "15:58:11", viewUrl: "https://drive.google.com/file/d/1Ifcefv_jTvrK0YoBzszX29JpuvP2GbEQ/view?usp=drivesdk" },
+          { id: "1OEQ8XyMo-3jZOW3WAUlI3eBSq3xjhRYH", title: "20260911_155833.jpg", time: "15:58:33", viewUrl: "https://drive.google.com/file/d/1OEQ8XyMo-3jZOW3WAUlI3eBSq3xjhRYH/view?usp=drivesdk" },
+          { id: "1uAfzOqbJdCu74QGi0_cK3YeG4W9m12pT", title: "20260911_155941.mp4", time: "15:59:41", viewUrl: "https://drive.google.com/file/d/1uAfzOqbJdCu74QGi0_cK3YeG4W9m12pT/view?usp=drivesdk" }
+        ]
+      },
+      {
+        stop_id: 7, stop_number: "#07", name: "第 07 站風獅爺", date: "2026-09-11", time_display: "16:06:30 ~ 16:06:43",
+        location: "金門巡禮景點", photo_count: 2,
+        photos: [
+          { id: "1ejTox_e111YWntopIVWz3cwopzJs_uAi", title: "20260911_160630.jpg", time: "16:06:30", viewUrl: "https://drive.google.com/file/d/1ejTox_e111YWntopIVWz3cwopzJs_uAi/view?usp=drivesdk" },
+          { id: "11qgorhTWNKMAvByJ0kwctLYEmcYuWbGA", title: "20260911_160643.jpg", time: "16:06:43", viewUrl: "https://drive.google.com/file/d/11qgorhTWNKMAvByJ0kwctLYEmcYuWbGA/view?usp=drivesdk" }
+        ]
+      },
+      {
+        stop_id: 8, stop_number: "#08", name: "第 08 站風獅爺", date: "2026-09-11", time_display: "16:54:52 ~ 16:54:59",
+        location: "金門巡禮景點", photo_count: 2,
+        photos: [
+          { id: "14l6s5XubKKln-uNs1cdNa8L1EKVlmkS8", title: "20260911_165452.jpg", time: "16:54:52", viewUrl: "https://drive.google.com/file/d/14l6s5XubKKln-uNs1cdNa8L1EKVlmkS8/view?usp=drivesdk" },
+          { id: "1U0isWn98yXVmJfh_PrmLxJLkgvxgfIja", title: "20260911_165459.jpg", time: "16:54:59", viewUrl: "https://drive.google.com/file/d/1U0isWn98yXVmJfh_PrmLxJLkgvxgfIja/view?usp=drivesdk" }
+        ]
+      },
+      {
+        stop_id: 9, stop_number: "#09", name: "第 09 站風獅爺", date: "2026-09-11", time_display: "17:28:11",
+        location: "金門巡禮景點", photo_count: 1,
+        photos: [{ id: "1_GvsOFwCumAH6vVBzTLXE0BsgcVTF3QX", title: "20260911_172811.jpg", time: "17:28:11", viewUrl: "https://drive.google.com/file/d/1_GvsOFwCumAH6vVBzTLXE0BsgcVTF3QX/view?usp=drivesdk" }]
+      },
+      {
+        stop_id: 10, stop_number: "#10", name: "第 10 站風獅爺", date: "2026-09-11", time_display: "17:31:34 ~ 17:31:45",
+        location: "金門巡禮景點", photo_count: 2,
+        photos: [
+          { id: "1O6wVvXFb88bmTU5nttK-4Q33oefvj9h3", title: "20260911_173134.jpg", time: "17:31:34", viewUrl: "https://drive.google.com/file/d/1O6wVvXFb88bmTU5nttK-4Q33oefvj9h3/view?usp=drivesdk" },
+          { id: "1rdDRX0ht0jM8nAjzZst_YVXZGt8f9aRW", title: "20260911_173145.jpg", time: "17:31:45", viewUrl: "https://drive.google.com/file/d/1rdDRX0ht0jM8nAjzZst_YVXZGt8f9aRW/view?usp=drivesdk" }
+        ]
+      },
+      {
+        stop_id: 11, stop_number: "#11", name: "第 11 站風獅爺", date: "2026-09-11", time_display: "17:41:08 ~ 17:41:13",
+        location: "金門巡禮景點", photo_count: 2,
+        photos: [
+          { id: "1SQRjGhXjMVYJ1UINydflX6addYSRzesR", title: "20260911_174108.jpg", time: "17:41:08", viewUrl: "https://drive.google.com/file/d/1SQRjGhXjMVYJ1UINydflX6addYSRzesR/view?usp=drivesdk" },
+          { id: "1H8-sjAgR-ZqX5v6OXhFQNBBDfLaDcWAv", title: "20260911_174113.jpg", time: "17:41:13", viewUrl: "https://drive.google.com/file/d/1H8-sjAgR-ZqX5v6OXhFQNBBDfLaDcWAv/view?usp=drivesdk" }
+        ]
+      },
+      {
+        stop_id: 12, stop_number: "#12", name: "第 12 站風獅爺", date: "2026-09-11", time_display: "17:50:10 ~ 17:50:18",
+        location: "金門巡禮景點", photo_count: 2,
+        photos: [
+          { id: "1mupd1EdbDI7t3MvZtB4YghNcFq8CLf3q", title: "20260911_175010.jpg", time: "17:50:10", viewUrl: "https://drive.google.com/file/d/1mupd1EdbDI7t3MvZtB4YghNcFq8CLf3q/view?usp=drivesdk" },
+          { id: "1_KiSd7iO67Bx2Q5SA_3TEyA6h2Yq4V4l", title: "20260911_175018.jpg", time: "17:50:18", viewUrl: "https://drive.google.com/file/d/1_KiSd7iO67Bx2Q5SA_3TEyA6h2Yq4V4l/view?usp=drivesdk" }
+        ]
+      },
+      {
+        stop_id: 13, stop_number: "#13", name: "第 13 站風獅爺", date: "2026-09-11", time_display: "18:00:38 ~ 18:00:41",
+        location: "金門巡禮景點", photo_count: 2,
+        photos: [
+          { id: "16tzRaipv96dAMSphiEofCrEiKy6AacCr", title: "20260911_180038.jpg", time: "18:00:38", viewUrl: "https://drive.google.com/file/d/16tzRaipv96dAMSphiEofCrEiKy6AacCr/view?usp=drivesdk" },
+          { id: "10KuM3pCnaRxWjQGk7ZKHVcxtjew8B6hb", title: "20260911_180041.jpg", time: "18:00:41", viewUrl: "https://drive.google.com/file/d/10KuM3pCnaRxWjQGk7ZKHVcxtjew8B6hb/view?usp=drivesdk" }
+        ]
+      },
+      {
+        stop_id: 14, stop_number: "#14", name: "第 14 站風獅爺", date: "2026-09-11", time_display: "18:05:39",
+        location: "金門巡禮景點", photo_count: 1,
+        photos: [{ id: "1IpWmfFpZ2o8fUsUciQvtOH9g2vUoB_AW", title: "20260911_180539.jpg", time: "18:05:39", viewUrl: "https://drive.google.com/file/d/1IpWmfFpZ2o8fUsUciQvtOH9g2vUoB_AW/view?usp=drivesdk" }]
+      },
+      {
+        stop_id: 15, stop_number: "#15", name: "第 15 站風獅爺", date: "2026-09-11", time_display: "18:15:04 ~ 18:18:04",
+        location: "金門巡禮景點", photo_count: 3,
+        photos: [
+          { id: "1Y9rXvXEba6dK4Fs8Xqp9bctQrnh5YFVV", title: "20260911_181504.jpg", time: "18:15:04", viewUrl: "https://drive.google.com/file/d/1Y9rXvXEba6dK4Fs8Xqp9bctQrnh5YFVV/view?usp=drivesdk" },
+          { id: "1wNs05aCocYTq9ZJx0RJk605D2k1sQ6hy", title: "20260911_181533.jpg", time: "18:15:33", viewUrl: "https://drive.google.com/file/d/1wNs05aCocYTq9ZJx0RJk605D2k1sQ6hy/view?usp=drivesdk" },
+          { id: "1ZWIJ-Zxcs1l8R_ziRdF6IIJ4RrgnmW2b", title: "20260911_181804.jpg", time: "18:18:04", viewUrl: "https://drive.google.com/file/d/1ZWIJ-Zxcs1l8R_ziRdF6IIJ4RrgnmW2b/view?usp=drivesdk" }
+        ]
+      },
+      {
+        stop_id: 16, stop_number: "#16", name: "第 16 站風獅爺", date: "2026-09-11", time_display: "18:27:23",
+        location: "金門巡禮景點", photo_count: 1,
+        photos: [{ id: "1kKhh9i5Y9NR52XydWoCv1ptuk7NVmNr-", title: "20260911_182723.jpg", time: "18:27:23", viewUrl: "https://drive.google.com/file/d/1kKhh9i5Y9NR52XydWoCv1ptuk7NVmNr-/view?usp=drivesdk" }]
+      },
+      {
+        stop_id: 17, stop_number: "#17", name: "第 17 站風獅爺", date: "2026-09-12", time_display: "10:05:24 ~ 10:05:50",
+        location: "金門巡禮景點", photo_count: 2,
+        photos: [
+          { id: "1xR1geWCzB_JNto4DQHOeSK6w9yrUQAIo", title: "20260912_100524.jpg", time: "10:05:24", viewUrl: "https://drive.google.com/file/d/1xR1geWCzB_JNto4DQHOeSK6w9yrUQAIo/view?usp=drivesdk" },
+          { id: "1Un9wKcHT5k2avlVOOSGLdFEFvempu-wx", title: "20260912_100550.jpg", time: "10:05:50", viewUrl: "https://drive.google.com/file/d/1Un9wKcHT5k2avlVOOSGLdFEFvempu-wx/view?usp=drivesdk" }
+        ]
+      },
+      {
+        stop_id: 18, stop_number: "#18", name: "第 18 站風獅爺", date: "2026-09-12", time_display: "11:06:26",
+        location: "金門巡禮景點", photo_count: 1,
+        photos: [{ id: "1Ok_P2Tn2BrAa-JycVjlia6qplI8e5cyY", title: "20260912_110626.jpg", time: "11:06:26", viewUrl: "https://drive.google.com/file/d/1Ok_P2Tn2BrAa-JycVjlia6qplI8e5cyY/view?usp=drivesdk" }]
+      },
+      {
+        stop_id: 19, stop_number: "#19", name: "第 19 站風獅爺", date: "2026-09-12", time_display: "11:46:20 ~ 11:47:42",
+        location: "金門巡禮景點", photo_count: 5,
+        photos: [
+          { id: "1Lek5RMIrBkUt7cC1xhOUlD_ad1vdiHLU", title: "20260912_114620.jpg", time: "11:46:20", viewUrl: "https://drive.google.com/file/d/1Lek5RMIrBkUt7cC1xhOUlD_ad1vdiHLU/view?usp=drivesdk" },
+          { id: "1PF3SqVm77seO06Ju3je1vfmBuBJ5iX16", title: "20260912_114628.jpg", time: "11:46:28", viewUrl: "https://drive.google.com/file/d/1PF3SqVm77seO06Ju3je1vfmBuBJ5iX16/view?usp=drivesdk" },
+          { id: "1MzZylpB6peh7vSgKoAs_rDQcN6KBrPBW", title: "20260912_114659.jpg", time: "11:46:59", viewUrl: "https://drive.google.com/file/d/1MzZylpB6peh7vSgKoAs_rDQcN6KBrPBW/view?usp=drivesdk" },
+          { id: "1rao9dsm6OLxIxY-w-zeNm5YeFfgtaby-", title: "20260912_114725.jpg", time: "11:47:25", viewUrl: "https://drive.google.com/file/d/1rao9dsm6OLxIxY-w-zeNm5YeFfgtaby-/view?usp=drivesdk" },
+          { id: "1RJHiekbv2TTDzfRvsxF70Kci_neA4yko", title: "20260912_114742.jpg", time: "11:47:42", viewUrl: "https://drive.google.com/file/d/1RJHiekbv2TTDzfRvsxF70Kci_neA4yko/view?usp=drivesdk" }
+        ]
+      },
+      {
+        stop_id: 20, stop_number: "#20", name: "第 20 站風獅爺", date: "2026-09-12", time_display: "13:26:59 ~ 13:27:07",
+        location: "金門巡禮景點", photo_count: 2,
+        photos: [
+          { id: "1uV6JYosgOHY9vBXNjPHacCiu78vY8NvB", title: "20260912_132659.jpg", time: "13:26:59", viewUrl: "https://drive.google.com/file/d/1uV6JYosgOHY9vBXNjPHacCiu78vY8NvB/view?usp=drivesdk" },
+          { id: "1YFVVa7txVGRemnEVTrQX7QOcNHqdRfPk", title: "20260912_132707.jpg", time: "13:27:07", viewUrl: "https://drive.google.com/file/d/1YFVVa7txVGRemnEVTrQX7QOcNHqdRfPk/view?usp=drivesdk" }
+        ]
+      },
+      {
+        stop_id: 21, stop_number: "#21", name: "第 21 站風獅爺", date: "2026-09-12", time_display: "15:21:27",
+        location: "金門巡禮景點", photo_count: 1,
+        photos: [{ id: "1zif8Nzz2S7cqVDdpSkkhXQxILssswMAI", title: "20260912_152127.jpg", time: "15:21:27", viewUrl: "https://drive.google.com/file/d/1zif8Nzz2S7cqVDdpSkkhXQxILssswMAI/view?usp=drivesdk" }]
+      },
+      {
+        stop_id: 22, stop_number: "#22", name: "第 22 站風獅爺", date: "2026-09-12", time_display: "15:40:11",
+        location: "金門巡禮景點", photo_count: 1,
+        photos: [{ id: "1TpgZq-CHd93H9Drr8e_QcUkXYvvqFtgp", title: "20260912_154011.jpg", time: "15:40:11", viewUrl: "https://drive.google.com/file/d/1TpgZq-CHd93H9Drr8e_QcUkXYvvqFtgp/view?usp=drivesdk" }]
+      },
+      {
+        stop_id: 23, stop_number: "#23", name: "第 23 站風獅爺", date: "2026-09-12", time_display: "15:46:07 ~ 15:46:36",
+        location: "金門巡禮景點", photo_count: 4,
+        photos: [
+          { id: "1aNZwh4wzENYj-KbJwueblJQtinbcPVg5", title: "20260912_154607.jpg", time: "15:46:07", viewUrl: "https://drive.google.com/file/d/1aNZwh4wzENYj-KbJwueblJQtinbcPVg5/view?usp=drivesdk" },
+          { id: "1elgQFS3ATa2Il-Gp7p4ItgIEnUdydS2X", title: "20260912_154612.jpg", time: "15:46:12", viewUrl: "https://drive.google.com/file/d/1elgQFS3ATa2Il-Gp7p4ItgIEnUdydS2X/view?usp=drivesdk" },
+          { id: "1aN_5WivZt1Iaz6NJ6S67QHDJ8zpNpSoY", title: "20260912_154629.jpg", time: "15:46:29", viewUrl: "https://drive.google.com/file/d/1aN_5WivZt1Iaz6NJ6S67QHDJ8zpNpSoY/view?usp=drivesdk" },
+          { id: "1x8CHHnl7ZpIR9feiKOXLy88SbxcPjkVz", title: "20260912_154636.jpg", time: "15:46:36", viewUrl: "https://drive.google.com/file/d/1x8CHHnl7ZpIR9feiKOXLy88SbxcPjkVz/view?usp=drivesdk" }
+        ]
+      },
+      {
+        stop_id: 24, stop_number: "#24", name: "第 24 站風獅爺", date: "2026-09-12", time_display: "15:55:29 ~ 16:00:51",
+        location: "金門巡禮景點", photo_count: 5,
+        photos: [
+          { id: "14A8-IO8B7sQZVk7wdsBtjrYFGuuQy0AC", title: "20260912_155529.jpg", time: "15:55:29", viewUrl: "https://drive.google.com/file/d/14A8-IO8B7sQZVk7wdsBtjrYFGuuQy0AC/view?usp=drivesdk" },
+          { id: "10b3IiKXXZ3yRdT2bA3b4N9463LLH1mrE", title: "20260912_155609.jpg", time: "15:56:09", viewUrl: "https://drive.google.com/file/d/10b3IiKXXZ3yRdT2bA3b4N9463LLH1mrE/view?usp=drivesdk" },
+          { id: "1aTXDjPT3p1fjHdx93ShRwGJsIPPhbhUT", title: "20260912_155622.jpg", time: "15:56:22", viewUrl: "https://drive.google.com/file/d/1aTXDjPT3p1fjHdx93ShRwGJsIPPhbhUT/view?usp=drivesdk" },
+          { id: "1z129nNA5m3KlPzDWCy_A6DJDE_2cj_rz", title: "20260912_155829.jpg", time: "15:58:29", viewUrl: "https://drive.google.com/file/d/1z129nNA5m3KlPzDWCy_A6DJDE_2cj_rz/view?usp=drivesdk" },
+          { id: "1h8BEmy53CJeYVJptM4AkTg-Dg3cKUOzI", title: "20260912_160051.jpg", time: "16:00:51", viewUrl: "https://drive.google.com/file/d/1h8BEmy53CJeYVJptM4AkTg-Dg3cKUOzI/view?usp=drivesdk" }
+        ]
+      },
+      {
+        stop_id: 25, stop_number: "#25", name: "第 25 站風獅爺", date: "2026-09-12", time_display: "16:16:27",
+        location: "金門巡禮景點", photo_count: 1,
+        photos: [{ id: "1LnkZlDE82EET-fk2Pfap8opXJj6tSRK5", title: "20260912_161627.jpg", time: "16:16:27", viewUrl: "https://drive.google.com/file/d/1LnkZlDE82EET-fk2Pfap8opXJj6tSRK5/view?usp=drivesdk" }]
+      },
+      {
+        stop_id: 26, stop_number: "#26", name: "第 26 站風獅爺", date: "2026-09-12", time_display: "16:52:50",
+        location: "金門巡禮景點", photo_count: 1,
+        photos: [{ id: "1jR1uzaqo48OVV07ZBsK3GS9AJv4OKVJV", title: "20260912_165250.jpg", time: "16:52:50", viewUrl: "https://drive.google.com/file/d/1jR1uzaqo48OVV07ZBsK3GS9AJv4OKVJV/view?usp=drivesdk" }]
+      },
+      {
+        stop_id: 27, stop_number: "#27", name: "第 27 站風獅爺", date: "2026-09-12", time_display: "17:16:14",
+        location: "金門巡禮景點", photo_count: 1,
+        photos: [{ id: "1Xozr3Cqx8ryrcwTjSeNeU5aR9mLi8WgQ", title: "20260912_171614.jpg", time: "17:16:14", viewUrl: "https://drive.google.com/file/d/1Xozr3Cqx8ryrcwTjSeNeU5aR9mLi8WgQ/view?usp=drivesdk" }]
+      },
+      {
+        stop_id: 28, stop_number: "#28", name: "第 28 站風獅爺", date: "2026-09-12", time_display: "17:30:18",
+        location: "金門巡禮景點", photo_count: 1,
+        photos: [{ id: "1--ZtKiNx75ji3er7fk8nS7ggNNeJC-T2", title: "20260912_173018.jpg", time: "17:30:18", viewUrl: "https://drive.google.com/file/d/1--ZtKiNx75ji3er7fk8nS7ggNNeJC-T2/view?usp=drivesdk" }]
+      },
+      {
+        stop_id: 29, stop_number: "#29", name: "第 29 站風獅爺", date: "2026-09-12", time_display: "17:38:15 ~ 17:41:16",
+        location: "金門巡禮景點", photo_count: 3,
+        photos: [
+          { id: "1GyFKA41wk5viO-MkbXTMLvqIvPHjYfF4", title: "20260912_173815.jpg", time: "17:38:15", viewUrl: "https://drive.google.com/file/d/1GyFKA41wk5viO-MkbXTMLvqIvPHjYfF4/view?usp=drivesdk" },
+          { id: "1tDhnZXKIDHU92zhCmZyw2lQR411UruDE", title: "20260912_173821.jpg", time: "17:38:21", viewUrl: "https://drive.google.com/file/d/1tDhnZXKIDHU92zhCmZyw2lQR411UruDE/view?usp=drivesdk" },
+          { id: "1b3jxWvV8xAbY_crqBSm1Nt9AWBW-ce2S", title: "20260912_174116.jpg", time: "17:41:16", viewUrl: "https://drive.google.com/file/d/1b3jxWvV8xAbY_crqBSm1Nt9AWBW-ce2S/view?usp=drivesdk" }
+        ]
+      },
+      {
+        stop_id: 30, stop_number: "#30", name: "第 30 站風獅爺", date: "2026-09-13", time_display: "08:12:56 ~ 08:13:31",
+        location: "金門巡禮景點", photo_count: 2,
+        photos: [
+          { id: "12cYTOdJuM_jFSBXnhj_ReJ5V1wR7syB9", title: "20260913_081256.jpg", time: "08:12:56", viewUrl: "https://drive.google.com/file/d/12cYTOdJuM_jFSBXnhj_ReJ5V1wR7syB9/view?usp=drivesdk" },
+          { id: "1dp20T4YVJCqNlpuG5uvP0ykH_xYXFkIY", title: "20260913_081331.jpg", time: "08:13:31", viewUrl: "https://drive.google.com/file/d/1dp20T4YVJCqNlpuG5uvP0ykH_xYXFkIY/view?usp=drivesdk" }
+        ]
+      }
+    ];
+
+    // 初始化縮圖網址
+    stopsData.forEach(s => {
+      s.photos.forEach(p => {
+        p.thumbnailUrl = `https://drive.google.com/thumbnail?id=${p.id}&sz=w800`;
+      });
+    });
+
+    let currentFilter = 'ALL';
+    let markers = {};
+    let map;
+    const svgFallback = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='200' fill='%23e2e8f0'><rect width='300' height='200'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='%2364748b' font-size='14'>風獅爺相片</text></svg>";
+
+    function initMap() {
+      map = L.map('map').setView([24.448, 118.375], 12);
+
+      // Google 道路圖
+      const googleRoads = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        maxZoom: 20, subdomains: ['0', '1', '2', '3'], attribution: '© Google Maps'
+      });
+      // CartoDB 全彩地圖
+      const cartoVoyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19, subdomains: 'abcd', attribution: '© CARTO'
+      });
+      // 臺灣通用電子地圖
+      const nlscEmap = L.tileLayer('https://wmts.nlsc.gov.tw/wmts/EMAP/default/EPSG:3857/{z}/{y}/{x}', {
+        maxZoom: 20, attribution: '© 國土測繪圖資服務雲'
+      });
+      // Google 衛星混合圖
+      const googleHybrid = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+        maxZoom: 20, subdomains: ['0', '1', '2', '3'], attribution: '© Google Maps Satellite'
+      });
+
+      googleRoads.addTo(map);
+
+      L.control.layers({
+        "Google 道路地圖 (推薦)": googleRoads,
+        "CartoDB 全彩地圖": cartoVoyager,
+        "臺灣通用電子地圖 (NLSC)": nlscEmap,
+        "Google 衛星混合圖": googleHybrid
+      }, null, { position: 'topright' }).addTo(map);
+
+      renderMarkers();
+      renderList();
+      updateCounts();
+    }
+
+    function createNumberedIcon(num) {
+      return L.divIcon({
+        className: 'custom-pin',
+        html: `<div class="numbered-pin"><span class="pin-label">${num}</span></div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -32]
+      });
+    }
+
+    function renderMarkers() {
+      for (let id in markers) { map.removeLayer(markers[id]); }
+      markers = {};
+
+      stopsData.forEach(stop => {
+        if (stop.lat && stop.lng) {
+          if (currentFilter !== 'ALL' && stop.date !== currentFilter) return;
+
+          const marker = L.marker([stop.lat, stop.lng], { icon: createNumberedIcon(stop.stop_id) }).addTo(map);
+          const firstPhoto = stop.photos[0];
+          const imgUrl = firstPhoto.localUrl || firstPhoto.thumbnailUrl;
+
+          let galleryHtml = '';
+          if (stop.photos.length > 1) {
+            galleryHtml = '<div class="popup-gallery">' + stop.photos.map((p, pIdx) => `
+              <img class="gallery-img" src="${p.localUrl || p.thumbnailUrl}" onerror="this.src='${svgFallback}'" 
+                   onclick="document.getElementById('main-img-${stop.stop_id}').src=this.src" title="相片 ${pIdx + 1}: ${p.time}">
+            `).join('') + '</div>';
+          }
+
+          const popupContent = `
+            <div class="popup-box">
+              <div class="popup-header">
+                <div class="popup-title">${stop.stop_number} ${stop.name}</div>
+                <div class="popup-badge">${stop.photo_count} 張照片</div>
+              </div>
+              <div class="popup-meta">
+                <div><i class="fa-regular fa-clock"></i> <strong>拍攝時間：</strong>${stop.date} ${stop.time_display}</div>
+                <div><i class="fa-solid fa-location-dot"></i> <strong>地點：</strong>${stop.location}</div>
+              </div>
+              <img id="main-img-${stop.stop_id}" class="popup-main-img" src="${imgUrl}" onerror="this.src='${svgFallback}'" alt="${stop.name}">
+              ${galleryHtml}
+              <div class="popup-actions">
+                <a href="${firstPhoto.viewUrl}" target="_blank" class="popup-link">
+                  <i class="fa-brands fa-google-drive"></i> 開啟雲端硬碟原圖
+                </a>
+              </div>
+            </div>
+          `;
+
+          marker.bindPopup(popupContent, { maxWidth: 300 });
+          marker.on('click', () => highlightCard(stop.stop_id));
+          markers[stop.stop_id] = marker;
+        }
+      });
+    }
+
+    function renderList() {
+      const listEl = document.getElementById('stopsList');
+      listEl.innerHTML = '';
+      const filtered = stopsData.filter(s => currentFilter === 'ALL' || s.date === currentFilter);
+
+      filtered.forEach(stop => {
+        const card = document.createElement('div');
+        card.className = `stop-card ${stop.lat ? 'has-pin' : ''}`;
+        card.id = `stop-card-${stop.stop_id}`;
+        card.onclick = () => focusStop(stop);
+
+        const firstPhoto = stop.photos[0];
+        const thumbUrl = firstPhoto.localUrl || firstPhoto.thumbnailUrl;
+
+        const badgeHtml = stop.lat 
+          ? `<span class="badge-status status-pinned"><i class="fa-solid fa-location-dot"></i> 已定位</span>`
+          : `<span class="badge-status status-wait"><i class="fa-regular fa-clock"></i> 待定位</span>`;
+
+        card.innerHTML = `
+          <div class="stop-num-badge">${stop.stop_number}</div>
+          <div class="stop-thumb-box">
+            <img class="stop-thumb" src="${thumbUrl}" onerror="this.src='${svgFallback}'" alt="thumb">
+            <div class="stop-photo-count"><i class="fa-solid fa-images"></i> ${stop.photo_count}</div>
+          </div>
+          <div class="stop-details">
+            <div class="stop-name">${stop.name}</div>
+            <div class="stop-time"><i class="fa-regular fa-clock"></i> ${stop.date} ${stop.time_display}</div>
+            <div class="stop-loc">${stop.lat ? '<i class="fa-solid fa-map-pin"></i> ' + stop.location : badgeHtml}</div>
+          </div>
+        `;
+        listEl.appendChild(card);
+      });
+    }
+
+    function focusStop(stop) {
+      highlightCard(stop.stop_id);
+      if (stop.lat && stop.lng && markers[stop.stop_id]) {
+        map.flyTo([stop.lat, stop.lng], 16, { duration: 1 });
+        markers[stop.stop_id].openPopup();
+      } else {
+        alert(`【${stop.stop_number} ${stop.name}】\n拍攝時間：${stop.date} ${stop.time_display}\n內含 ${stop.photo_count} 張相片。\n尚未載入 GPS 座標。請點擊上方按鈕選取照片資料夾，系統將讀取 EXIF 自動在地圖上插上旗標！`);
+      }
+    }
+
+    function highlightCard(stopId) {
+      document.querySelectorAll('.stop-card').forEach(c => c.classList.remove('active'));
+      const card = document.getElementById(`stop-card-${stopId}`);
+      if (card) {
+        card.classList.add('active');
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+
+    function setFilter(filter) {
+      currentFilter = filter;
+      document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+      renderMarkers();
+      renderList();
+    }
+
+    function updateCounts() {
+      let pinnedCount = 0;
+      stopsData.forEach(s => { if (s.lat && s.lng) pinnedCount++; });
+      document.getElementById('pinned-count').innerText = pinnedCount;
+    }
+
+    // 自動讀取照片 EXIF 並自動將相近的相片整合至該站旗標
+    async function handleFiles(files) {
+      let matchedCount = 0;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        for (let stop of stopsData) {
+          const photoMatch = stop.photos.find(p => p.title === file.name);
+          if (photoMatch) {
+            photoMatch.localUrl = URL.createObjectURL(file);
+            try {
+              const exif = await exifr.parse(file, ['latitude', 'longitude', 'DateTimeOriginal']);
+              if (exif && exif.latitude && exif.longitude) {
+                stop.lat = exif.latitude;
+                stop.lng = exif.longitude;
+                stop.location = `座標: ${exif.latitude.toFixed(5)}, ${exif.longitude.toFixed(5)}`;
+              }
+            } catch (e) {
+              console.error(e);
+            }
+            matchedCount++;
+          }
+        }
+      }
+      alert(`已成功匹配 ${matchedCount} 張相片！相近時間與 GPS 的照片已自動整合成同一個風獅爺標籤，並按時序完成編號。`);
+      renderMarkers();
+      renderList();
+      updateCounts();
+
+      const group = Object.values(markers);
+      if (group.length > 0) {
+        const fg = L.featureGroup(group);
+        map.fitBounds(fg.getBounds().pad(0.1));
+      }
+    }
+
+    function exportGeoJSON() {
+      const geojson = {
+        type: "FeatureCollection",
+        features: stopsData.filter(s => s.lat && s.lng).map(s => ({
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [s.lng, s.lat] },
+          properties: {
+            stop_id: s.stop_id,
+            stop_number: s.stop_number,
+            name: s.name,
+            date: s.date,
+            time_display: s.time_display,
+            location: s.location,
+            photo_count: s.photo_count,
+            photos: s.photos.map(p => ({ title: p.title, time: p.time, viewUrl: p.viewUrl }))
+          }
+        }))
+      };
+      const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'kinmen_wind_lion_stops.geojson';
+      a.click();
+    }
+
+    const dropArea = document.getElementById('dropArea');
+    const dropOverlay = document.getElementById('dropOverlay');
+    window.addEventListener('dragover', (e) => { e.preventDefault(); dropOverlay.style.display = 'flex'; });
+    dropOverlay.addEventListener('dragleave', (e) => { dropOverlay.style.display = 'none'; });
+    window.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropOverlay.style.display = 'none';
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        handleFiles(e.dataTransfer.files);
+      }
+    });
+
+    window.onload = initMap;
+  </script>
+</body>
+</html>
