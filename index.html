@@ -51,7 +51,7 @@
     .pin-label { transform: rotate(45deg); }
 
     /* 旗標展開彈窗 */
-    .popup-box { width: 280px; font-family: inherit; }
+    .popup-box { width: 290px; font-family: inherit; }
     .popup-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
     .popup-title { font-size: 0.95rem; font-weight: 700; color: #1e3a8a; }
     .popup-badge { background: #dbeafe; color: #1d4ed8; font-size: 0.7rem; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
@@ -60,8 +60,9 @@
     .popup-gallery { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0; margin-bottom: 8px; }
     .gallery-img { width: 75px; height: 55px; object-fit: cover; border-radius: 4px; border: 1px solid #cbd5e1; cursor: pointer; }
     .popup-main-img { width: 100%; height: 165px; object-fit: cover; border-radius: 6px; margin-bottom: 6px; }
-    .popup-actions { display: flex; gap: 6px; }
-    .popup-link { flex: 1; text-align: center; padding: 4px 6px; background: #2563eb; color: white; text-decoration: none; border-radius: 4px; font-size: 0.72rem; font-weight: 600; }
+    .popup-actions { display: flex; gap: 5px; }
+    .popup-link { flex: 1; text-align: center; padding: 5px 3px; background: #2563eb; color: white; text-decoration: none; border-radius: 4px; font-size: 0.68rem; font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 3px; }
+    .leaflet-control-layers { border-radius: 8px !important; box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important; font-size: 0.8rem !important; }
     .drop-overlay { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(37,99,235,0.88); color: white; z-index: 9999; justify-content: center; align-items: center; flex-direction: column; gap: 12px; font-size: 1.15rem; font-weight: 600; }
     @media (max-width: 768px) { .main-container { flex-direction: column; } #sidebar { width: 100%; height: 45%; } #map { height: 55%; } }
   </style>
@@ -169,7 +170,7 @@
         ]
       },
       {
-        stop_id: 9, stop_number: "#09", name: "第 09 站風獅爺", date: "2026-09-11", time_display: "17:28:11",
+        stop_id: 9, stop_number: "#09", name: "夏興風獅爺", date: "2026-09-11", time_display: "17:28:11",
         lat: 24.439757, lng: 118.3944648, location: "金湖鎮 (座標: 24.43976, 118.39446)", photo_count: 1,
         photos: [{ id: "1_GvsOFwCumAH6vVBzTLXE0BsgcVTF3QX", title: "20260911_172811.jpg", time: "17:28:11", viewUrl: "https://drive.google.com/file/d/1_GvsOFwCumAH6vVBzTLXE0BsgcVTF3QX/view?usp=drivesdk" }]
       },
@@ -182,7 +183,7 @@
         ]
       },
       {
-        stop_id: 11, stop_number: "#11", name: "第 11 站風獅爺", date: "2026-09-11", time_display: "17:41:08 ~ 17:41:13",
+        stop_id: 11, stop_number: "#11", name: "中蘭風獅爺", date: "2026-09-11", time_display: "17:41:08 ~ 17:41:13",
         lat: 24.4634501, lng: 118.3858824, location: "金沙鎮 (座標: 24.46345, 118.38588)", photo_count: 2,
         photos: [
           { id: "1SQRjGhXjMVYJ1UINydflX6addYSRzesR", title: "20260911_174108.jpg", time: "17:41:08", viewUrl: "https://drive.google.com/file/d/1SQRjGhXjMVYJ1UINydflX6addYSRzesR/view?usp=drivesdk" },
@@ -190,7 +191,7 @@
         ]
       },
       {
-        stop_id: 12, stop_number: "#12", name: "第 12 站風獅爺", date: "2026-09-11", time_display: "17:50:10 ~ 17:50:18",
+        stop_id: 12, stop_number: "#12", name: "瓊林風獅爺", date: "2026-09-11", time_display: "17:50:10 ~ 17:50:18",
         lat: 24.4568638, lng: 118.3740299, location: "金湖鎮 (座標: 24.45686, 118.37403)", photo_count: 2,
         photos: [
           { id: "1mupd1EdbDI7t3MvZtB4YghNcFq8CLf3q", title: "20260911_175010.jpg", time: "17:50:10", viewUrl: "https://drive.google.com/file/d/1mupd1EdbDI7t3MvZtB4YghNcFq8CLf3q/view?usp=drivesdk" },
@@ -233,12 +234,12 @@
         ]
       },
       {
-        stop_id: 18, stop_number: "#18", name: "第 18 站風獅爺", date: "2026-09-12", time_display: "11:06:26",
+        stop_id: 18, stop_number: "#18", name: "風獅爺文物坊", date: "2026-09-12", time_display: "11:06:26",
         lat: 24.4094756, lng: 118.298667, location: "金城鎮 (座標: 24.40948, 118.29867)", photo_count: 1,
         photos: [{ id: "1Ok_P2Tn2BrAa-JycVjlia6qplI8e5cyY", title: "20260912_110626.jpg", time: "11:06:26", viewUrl: "https://drive.google.com/file/d/1Ok_P2Tn2BrAa-JycVjlia6qplI8e5cyY/view?usp=drivesdk" }]
       },
       {
-        stop_id: 19, stop_number: "#19", name: "第 19 站風獅爺", date: "2026-09-12", time_display: "11:46:20 ~ 11:47:42",
+        stop_id: 19, stop_number: "#19", name: "迥向殿風獅爺", date: "2026-09-12", time_display: "11:46:20 ~ 11:47:42",
         lat: 24.4042653, lng: 118.3096337, location: "金城鎮 (座標: 24.40427, 118.30963)", photo_count: 5,
         photos: [
           { id: "1Lek5RMIrBkUt7cC1xhOUlD_ad1vdiHLU", title: "20260912_114620.jpg", time: "11:46:20", viewUrl: "https://drive.google.com/file/d/1Lek5RMIrBkUt7cC1xhOUlD_ad1vdiHLU/view?usp=drivesdk" },
@@ -263,12 +264,12 @@
       },
       {
         stop_id: 22, stop_number: "#22", name: "第 22 站風獅爺", date: "2026-09-12", time_display: "15:40:11",
-        lat: 24.4118108, lng: 118.3358585, location: "金寧鄉 (座標: 24.41181, 118.33586)", photo_count: 1,
+        lat: 24.4118108, lng: 118.3358585, location: "金城鎮 (座標: 24.41181, 118.33586)", photo_count: 1,
         photos: [{ id: "1TpgZq-CHd93H9Drr8e_QcUkXYvvqFtgp", title: "20260912_154011.jpg", time: "15:40:11", viewUrl: "https://drive.google.com/file/d/1TpgZq-CHd93H9Drr8e_QcUkXYvvqFtgp/view?usp=drivesdk" }]
       },
       {
         stop_id: 23, stop_number: "#23", name: "第 23 站風獅爺", date: "2026-09-12", time_display: "15:46:07 ~ 15:46:36",
-        lat: 24.4128779, lng: 118.336449, location: "金寧鄉 (座標: 24.41288, 118.33645)", photo_count: 4,
+        lat: 24.4128779, lng: 118.336449, location: "金城鎮 (座標: 24.41288, 118.33645)", photo_count: 4,
         photos: [
           { id: "1aNZwh4wzENYj-KbJwueblJQtinbcPVg5", title: "20260912_154607.jpg", time: "15:46:07", viewUrl: "https://drive.google.com/file/d/1aNZwh4wzENYj-KbJwueblJQtinbcPVg5/view?usp=drivesdk" },
           { id: "1elgQFS3ATa2Il-Gp7p4ItgIEnUdydS2X", title: "20260912_154612.jpg", time: "15:46:12", viewUrl: "https://drive.google.com/file/d/1elgQFS3ATa2Il-Gp7p4ItgIEnUdydS2X/view?usp=drivesdk" },
@@ -293,12 +294,12 @@
         photos: [{ id: "1LnkZlDE82EET-fk2Pfap8opXJj6tSRK5", title: "20260912_161627.jpg", time: "16:16:27", viewUrl: "https://drive.google.com/file/d/1LnkZlDE82EET-fk2Pfap8opXJj6tSRK5/view?usp=drivesdk" }]
       },
       {
-        stop_id: 26, stop_number: "#26", name: "第 26 站風獅爺", date: "2026-09-12", time_display: "16:52:50",
+        stop_id: 26, stop_number: "#26", name: "湖下風獅爺", date: "2026-09-12", time_display: "16:52:50",
         lat: 24.4577716, lng: 118.3085661, location: "金寧鄉 (座標: 24.45777, 118.30857)", photo_count: 1,
         photos: [{ id: "1jR1uzaqo48OVV07ZBsK3GS9AJv4OKVJV", title: "20260912_165250.jpg", time: "16:52:50", viewUrl: "https://drive.google.com/file/d/1jR1uzaqo48OVV07ZBsK3GS9AJv4OKVJV/view?usp=drivesdk" }]
       },
       {
-        stop_id: 27, stop_number: "#27", name: "第 27 站風獅爺", date: "2026-09-12", time_display: "17:16:14",
+        stop_id: 27, stop_number: "#27", name: "百年風獅爺", date: "2026-09-12", time_display: "17:16:14",
         lat: 24.4355484, lng: 118.237894, location: "烈嶼鄉 (座標: 24.43555, 118.23789)", photo_count: 1,
         photos: [{ id: "1Xozr3Cqx8ryrcwTjSeNeU5aR9mLi8WgQ", title: "20260912_171614.jpg", time: "17:16:14", viewUrl: "https://drive.google.com/file/d/1Xozr3Cqx8ryrcwTjSeNeU5aR9mLi8WgQ/view?usp=drivesdk" }]
       },
@@ -308,7 +309,7 @@
         photos: [{ id: "1--ZtKiNx75ji3er7fk8nS7ggNNeJC-T2", title: "20260912_173018.jpg", time: "17:30:18", viewUrl: "https://drive.google.com/file/d/1--ZtKiNx75ji3er7fk8nS7ggNNeJC-T2/view?usp=drivesdk" }]
       },
       {
-        stop_id: 29, stop_number: "#29", name: "第 29 站風獅爺", date: "2026-09-12", time_display: "17:38:15 ~ 17:41:16",
+        stop_id: 29, stop_number: "#29", name: "后頭風獅爺", date: "2026-09-12", time_display: "17:38:15 ~ 17:41:16",
         lat: 24.4405217, lng: 118.2599216, location: "烈嶼鄉 (座標: 24.44052, 118.25992)", photo_count: 3,
         photos: [
           { id: "1GyFKA41wk5viO-MkbXTMLvqIvPHjYfF4", title: "20260912_173815.jpg", time: "17:38:15", viewUrl: "https://drive.google.com/file/d/1GyFKA41wk5viO-MkbXTMLvqIvPHjYfF4/view?usp=drivesdk" },
@@ -341,41 +342,56 @@
     function initMap() {
       map = L.map('map').setView([24.448, 118.375], 12);
 
-      // Google 道路圖
+      // Google Maps 道路圖
       const googleRoads = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
         maxZoom: 20, subdomains: ['0', '1', '2', '3'], attribution: '© Google Maps'
+      });
+      // OpenStreetMap (OSM)
+      const osmStandard = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19, attribution: '© OpenStreetMap contributors'
+      });
+      // Google Maps 衛星混合圖
+      const googleHybrid = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+        maxZoom: 20, subdomains: ['0', '1', '2', '3'], attribution: '© Google Maps Satellite'
+      });
+      // 臺灣通用電子地圖 (NLSC)
+      const nlscEmap = L.tileLayer('https://wmts.nlsc.gov.tw/wmts/EMAP/default/EPSG:3857/{z}/{y}/{x}', {
+        maxZoom: 20, attribution: '© 國土測繪圖資服務雲'
       });
       // CartoDB 全彩地圖
       const cartoVoyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         maxZoom: 19, subdomains: 'abcd', attribution: '© CARTO'
       });
-      // 臺灣通用電子地圖
-      const nlscEmap = L.tileLayer('https://wmts.nlsc.gov.tw/wmts/EMAP/default/EPSG:3857/{z}/{y}/{x}', {
-        maxZoom: 20, attribution: '© 國土測繪圖資服務雲'
-      });
-      // Google 衛星混合圖
-      const googleHybrid = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-        maxZoom: 20, subdomains: ['0', '1', '2', '3'], attribution: '© Google Maps Satellite'
-      });
 
       googleRoads.addTo(map);
 
-      L.control.layers({
-        "Google 道路地圖 (推薦)": googleRoads,
-        "CartoDB 全彩地圖": cartoVoyager,
-        "臺灣通用電子地圖 (NLSC)": nlscEmap,
-        "Google 衛星混合圖": googleHybrid
-      }, null, { position: 'topright' }).addTo(map);
+      // 地圖底圖切換：支援 Google Maps 與 OpenStreetMap (OSM)
+      const baseMaps = {
+        "🗺️ Google Maps 道路圖": googleRoads,
+        "🌍 OpenStreetMap (OSM)": osmStandard,
+        "🛰️ Google Maps 衛星圖": googleHybrid,
+        "🇹🇼 臺灣通用電子地圖 (NLSC)": nlscEmap,
+        "🎨 CartoDB 全彩圖": cartoVoyager
+      };
+
+      L.control.layers(baseMaps, null, { position: 'topright', collapsed: false }).addTo(map);
 
       renderMarkers();
       renderList();
       updateCounts();
     }
 
+        // 根據站點編號 (1~30) 計算連續彩虹漸層色
+    function getRainbowColor(num, total = 30) {
+      const hue = Math.round(((num - 1) / (total - 1)) * 315);
+      return `hsl(${hue}, 88%, 45%)`;
+    }
+
     function createNumberedIcon(num) {
+      const color = getRainbowColor(num);
       return L.divIcon({
         className: 'custom-pin',
-        html: `<div class="numbered-pin"><span class="pin-label">${num}</span></div>`,
+        html: `<div class="numbered-pin" style="background-color: ${color};"><span class="pin-label">${num}</span></div>`,
         iconSize: [32, 32],
         iconAnchor: [16, 32],
         popupAnchor: [0, -32]
@@ -405,8 +421,8 @@
           const popupContent = `
             <div class="popup-box">
               <div class="popup-header">
-                <div class="popup-title">${stop.stop_number} ${stop.name}</div>
-                <div class="popup-badge">${stop.photo_count} 張照片</div>
+                <div class="popup-title" style="color: ${getRainbowColor(stop.stop_id)}; font-weight: 700;">${stop.stop_number} ${stop.name}</div>
+                <div class="popup-badge" style="background: ${getRainbowColor(stop.stop_id)}1a; color: ${getRainbowColor(stop.stop_id)}; border: 1px solid ${getRainbowColor(stop.stop_id)}40;">${stop.photo_count} 張照片</div>
               </div>
               <div class="popup-meta">
                 <div><i class="fa-regular fa-clock"></i> <strong>拍攝時間：</strong>${stop.date} ${stop.time_display}</div>
@@ -415,8 +431,14 @@
               <img id="main-img-${stop.stop_id}" class="popup-main-img" src="${imgUrl}" onerror="this.src='${svgFallback}'" alt="${stop.name}">
               ${galleryHtml}
               <div class="popup-actions">
-                <a href="${firstPhoto.viewUrl}" target="_blank" class="popup-link">
-                  <i class="fa-brands fa-google-drive"></i> 開啟雲端硬碟原圖
+                <a href="https://www.google.com/maps/search/?api=1&query=${stop.lat},${stop.lng}" target="_blank" class="popup-link" style="background:#ea4335;" title="在 Google Maps 查看此座標地標">
+                  <i class="fa-solid fa-map-location-dot"></i> Google Maps
+                </a>
+                <a href="https://www.openstreetmap.org/?mlat=${stop.lat}&mlon=${stop.lng}#map=18/${stop.lat}/${stop.lng}" target="_blank" class="popup-link" style="background:#059669;" title="在 OpenStreetMap 查看此座標地標">
+                  <i class="fa-regular fa-map"></i> OSM
+                </a>
+                <a href="${firstPhoto.viewUrl}" target="_blank" class="popup-link" title="開啟 Google Drive 雲端原圖">
+                  <i class="fa-brands fa-google-drive"></i> 原圖
                 </a>
               </div>
             </div>
@@ -448,7 +470,7 @@
           : `<span class="badge-status status-wait"><i class="fa-regular fa-clock"></i> 待定位</span>`;
 
         card.innerHTML = `
-          <div class="stop-num-badge">${stop.stop_number}</div>
+          <div class="stop-num-badge" style="background: ${getRainbowColor(stop.stop_id)};">${stop.stop_number}</div>
           <div class="stop-thumb-box">
             <img class="stop-thumb" src="${thumbUrl}" onerror="this.src='${svgFallback}'" alt="thumb">
             <div class="stop-photo-count"><i class="fa-solid fa-images"></i> ${stop.photo_count}</div>
@@ -474,10 +496,17 @@
     }
 
     function highlightCard(stopId) {
-      document.querySelectorAll('.stop-card').forEach(c => c.classList.remove('active'));
+      document.querySelectorAll('.stop-card').forEach(c => {
+        c.classList.remove('active');
+        c.style.borderColor = '';
+        c.style.backgroundColor = '';
+      });
       const card = document.getElementById(`stop-card-${stopId}`);
       if (card) {
+        const color = getRainbowColor(stopId);
         card.classList.add('active');
+        card.style.borderColor = color;
+        card.style.backgroundColor = color + '0d';
         card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
     }
