@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>金門風獅爺巡禮尋訪地圖 (全 30 站)</title>
+  <title>金門風獅爺巡禮</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script>
@@ -17,6 +17,20 @@
     .btn:hover { background: rgba(255,255,255,0.3); }
     .btn-primary { background: #f59e0b; border-color: #d97706; color: #0f172a; font-weight: 600; }
     .btn-primary:hover { background: #d97706; color: white; }
+    .btn.icon-only { width: 36px; height: 36px; padding: 0; justify-content: center; font-size: 0.95rem; }
+    .player-header { display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; font-weight: 700; color: #fde68a; }
+    .player-header .pbtn.mini { min-width: 28px; height: 26px; font-size: 0.72rem; padding: 0 6px; }
+    #playerBar.collapsed #playerBody { display: none; }
+    #playerBar.collapsed { width: auto; padding: 6px; gap: 0; }
+    #playerBar.collapsed .player-header { gap: 6px; }
+    #playerBar.collapsed .player-title { display: none; }
+    #playBtnMini { display: none; }
+    #playerBar.collapsed #playBtnMini { display: inline-flex; }
+    #playBtnMini.play { background: #f59e0b; border-color: #d97706; color: #0f172a; font-size: 0.85rem; min-width: 36px; height: 30px; }
+    #playBtnMini.play:hover { background: #d97706; color: white; }
+    #scrim { display: none; }
+    #listFab { display: none; }
+    #drawerClose { display: none; }
     .main-container { display: flex; flex: 1; height: calc(100vh - 52px); position: relative; }
     #map { flex: 1; height: 100%; z-index: 1; }
     #sidebar { width: 390px; background: white; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; height: 100%; z-index: 10; box-shadow: -2px 0 6px rgba(0,0,0,0.05); }
@@ -135,6 +149,7 @@
     #mobileTabs { display: none; }
     #sheetHandle { display: none; }
     #locateFab { display: none; }
+    .drawer-top { display: none; }
 
     /* 平板 (769px ~ 1024px)：側欄收窄、Header 緊湊 */
     @media (max-width: 1024px) and (min-width: 769px) {
@@ -144,7 +159,7 @@
       .header-actions { flex-wrap: wrap; justify-content: flex-end; max-width: 55vw; }
       .popup-box { width: 260px; }
     }
-    /* 手機 / 小平板直向 (<=768px)：地圖 + 底部抽屜 + 分頁切換 */
+    /* 手機 / 小平板直向 (<=768px)：地圖全屏 + 左側滑抽屜清單 */
     @media (max-width: 768px) {
       body { height: 100dvh; }
       header { padding: 8px 12px; flex-wrap: wrap; gap: 8px; }
@@ -155,19 +170,25 @@
       .header-actions .btn { white-space: nowrap; min-height: 36px; }
       .main-container { flex-direction: column; height: calc(100dvh - 52px - 48px); }
       #map { flex: 1; height: auto; min-height: 0; }
-      #sidebar { width: 100%; height: 42%; border-left: none; border-top: 1px solid #e2e8f0; border-radius: 12px 12px 0 0; margin-top: -12px; padding-bottom: env(safe-area-inset-bottom); }
-      #sheetHandle { display: flex; justify-content: center; align-items: center; padding: 6px; cursor: pointer; touch-action: none; }
-      #sheetHandle::before { content: ""; width: 40px; height: 4px; border-radius: 2px; background: #cbd5e1; }
-      /* 地圖/列表全屏切換模式 */
-      .main-container.map-mode #sidebar { height: 30%; }
-      .main-container.list-mode #map { display: none; }
-      .main-container.list-mode #sidebar { flex: 1; height: auto; margin-top: 0; border-radius: 0; }
+      /* 側滑抽屜：預設收合 (translateX 藏左側)，.drawer-open 時滑出 */
+      #sidebar { position: absolute; left: 0; top: 0; bottom: 0; width: min(84vw, 340px); height: auto; margin-top: 0; border-left: none; border-right: 1px solid #e2e8f0; border-radius: 0 12px 12px 0; transform: translateX(-105%); transition: transform 0.28s ease; z-index: 800; box-shadow: 2px 0 12px rgba(0,0,0,0.25); padding-bottom: env(safe-area-inset-bottom); }
+      .main-container.drawer-open #sidebar { transform: translateX(0); }
+      #scrim { position: absolute; inset: 0; background: rgba(0,0,0,0.35); z-index: 700; }
+      .main-container.drawer-open #scrim { display: block; }
+      .drawer-top { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-weight: 700; font-size: 0.88rem; background: #f8fafc; border-radius: 0 12px 0 0; }
+      #drawerClose { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; border: 1px solid #cbd5e1; background: white; cursor: pointer; color: #475569; }
+      #sheetHandle { display: none; }
+      /* 相容舊 map-mode / list-mode：list-mode 視為抽屜開啟 */
+      .main-container.map-mode #sidebar { height: auto; }
+      .main-container.list-mode #map { display: block; }
+      .main-container.list-mode #sidebar { flex: none; height: auto; margin-top: 0; border-radius: 0 12px 12px 0; }
       .main-container.map-mode #map { flex: 1; }
       #mobileTabs { display: flex; gap: 8px; padding: 6px 10px calc(6px + env(safe-area-inset-bottom)); background: white; border-top: 1px solid #e2e8f0; z-index: 1000; }
       #mobileTabs button { flex: 1; min-height: 40px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 0.85rem; font-weight: 600; color: #475569; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
       #mobileTabs button.active { background: #2563eb; color: white; border-color: #2563eb; }
-      #locateFab { display: flex; position: absolute; right: 12px; bottom: calc(30% + 20px); width: 44px; height: 44px; border-radius: 50%; border: none; background: white; color: #2563eb; box-shadow: 0 2px 8px rgba(0,0,0,0.25); z-index: 500; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; }
-      .main-container.list-mode #locateFab { display: none; }
+      #locateFab { display: flex; position: absolute; right: 12px; bottom: 12px; width: 44px; height: 44px; border-radius: 50%; border: none; background: white; color: #2563eb; box-shadow: 0 2px 8px rgba(0,0,0,0.25); z-index: 500; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; }
+      #listFab { display: flex; position: absolute; left: 12px; top: 12px; width: 44px; height: 44px; border-radius: 50%; border: none; background: #0f172a; color: #fde68a; box-shadow: 0 2px 8px rgba(0,0,0,0.3); z-index: 600; align-items: center; justify-content: center; font-size: 1.05rem; cursor: pointer; }
+      .main-container.drawer-open #listFab { display: none; }
       .filter-bar { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
       .filter-btn { min-height: 32px; white-space: nowrap; flex-shrink: 0; }
       .stop-card { padding: 12px 10px; }
@@ -182,8 +203,7 @@
     /* 超小手機 (<=380px) */
     @media (max-width: 380px) {
       header h1 { font-size: 0.82rem; }
-      #sidebar { height: 48%; }
-      .main-container.map-mode #sidebar { height: 34%; }
+      #sidebar { width: min(88vw, 320px); }
       .stop-name { font-size: 0.85rem; }
     }
     /* 導覽播放器 RWD：手機上縮小游標上的照片卡、播放器貼齊地圖底部 */
@@ -202,23 +222,29 @@
 <body>
 
   <header>
-    <h1><i class="fa-solid fa-flag"></i> 金門風獅爺巡禮尋訪地圖 (全 30 站・60 件影像)</h1>
-    <button class="btn" id="menuToggle" onclick="document.querySelector('.header-actions').classList.toggle('open')" title="功能選單"><i class="fa-solid fa-bars"></i></button>
+    <h1><i class="fa-solid fa-flag"></i> 金門風獅爺巡禮</h1>
+    <button class="btn icon-only" id="menuToggle" onclick="document.querySelector('.header-actions').classList.toggle('open')" title="功能選單"><i class="fa-solid fa-bars"></i></button>
     <div class="header-actions">
       <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none;" onchange="handleFiles(this.files)">
-      <button class="btn btn-primary" onclick="document.getElementById('folderInput').click()">
-        <i class="fa-solid fa-folder-open"></i> 匯入照片自動定位 GPS
+      <button class="btn btn-primary icon-only" onclick="document.getElementById('folderInput').click()" title="匯入照片自動定位 GPS">
+        <i class="fa-solid fa-folder-open"></i>
       </button>
-      <button class="btn" onclick="autoNamePlaceholders()" title="依五輪規則為佔位站命名，保證不重複"><i class="fa-solid fa-wand-magic-sparkles"></i> 五輪自動命名</button>
-      <button class="btn" onclick="renameAllStops()" title="依新五輪規則重算全部30站（R2視覺確認保留）"><i class="fa-solid fa-rotate"></i> 全部重算</button>
-      <button class="btn" onclick="exportGeoJSON()"><i class="fa-solid fa-download"></i> 匯出 GeoJSON</button>
+      <button class="btn icon-only" onclick="autoNamePlaceholders()" title="五輪自動命名：依五輪規則為佔位站命名，保證不重複"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+      <button class="btn icon-only" onclick="renameAllStops()" title="全部重算：依新五輪規則重算全部30站（R2視覺確認保留）"><i class="fa-solid fa-rotate"></i></button>
+      <button class="btn icon-only" onclick="exportGeoJSON()" title="匯出 GeoJSON"><i class="fa-solid fa-download"></i></button>
     </div>
   </header>
 
   <div class="main-container" id="dropArea">
     <div id="map">
-      <!-- 播放器：播放/暫停/上下站/停止/速度/進度；照片資訊卡改綁在機車游標正上方 -->
+      <!-- 播放器：可展開/收合；手機版預設收合 -->
       <div id="playerBar">
+        <div class="player-header">
+          <span class="player-title"><i class="fa-solid fa-motorcycle"></i> 導覽播放</span>
+          <button class="pbtn mini play" id="playBtnMini" onclick="togglePlay()" title="播放 / 暫停"><i class="fa-solid fa-play"></i></button>
+          <button class="pbtn mini" id="playerToggle" onclick="togglePlayerBar()" title="展開 / 收合"><i class="fa-solid fa-chevron-down"></i></button>
+        </div>
+        <div id="playerBody">
         <div class="player-row">
           <button class="pbtn" onclick="stepTour(-1)" title="上一站"><i class="fa-solid fa-backward-step"></i></button>
           <button class="pbtn play" id="playBtn" onclick="togglePlay()" title="播放 / 暫停"><i class="fa-solid fa-play"></i></button>
@@ -241,10 +267,14 @@
             <span id="tourStopName">🛵 一男一女・機車環島導覽</span>
           </div>
         </div>
+        </div>
       </div>
+      <button id="listFab" onclick="toggleDrawer()" title="風獅爺清單"><i class="fa-solid fa-list"></i></button>
     </div>
+    <div id="scrim" onclick="toggleDrawer(false)"></div>
     <div id="sidebar">
       <div id="sheetHandle" title="拖曳展開/收合"></div>
+      <div class="drawer-top"><span><i class="fa-solid fa-list"></i> 風獅爺清單</span><button id="drawerClose" onclick="toggleDrawer(false)" title="關閉"><i class="fa-solid fa-xmark"></i></button></div>
       <div class="filter-bar">
         <button class="filter-btn active" onclick="setFilter('ALL')">全部 (30 站)</button>
         <button class="filter-btn" onclick="setFilter('2026-09-10')">9/10 (1 站)</button>
@@ -846,7 +876,7 @@
         "🎨 CartoDB 全彩圖": cartoVoyager
       };
 
-      L.control.layers(baseMaps, null, { position: 'topright', collapsed: window.innerWidth <= 768 }).addTo(map);
+      L.control.layers(baseMaps, null, { position: 'topright', collapsed: true }).addTo(map);
 
       initMobileUI();
 
@@ -1088,52 +1118,85 @@
       }
     });
 
-    // ===== 手機/平板 UI：地圖/列表切換 + 底部抽屜拖曳 =====
+    // ===== 播放器展開 / 收合：手機版預設收合 =====
+    function togglePlayerBar(force) {
+      const bar = document.getElementById('playerBar');
+      let show;
+      if (typeof force === 'boolean') show = force;
+      else show = bar.classList.contains('collapsed');
+      bar.classList.toggle('collapsed', !show);
+      show = !bar.classList.contains('collapsed');
+      const t = document.getElementById('playerToggle');
+      if (t) t.innerHTML = show ? '<i class="fa-solid fa-chevron-down"></i>' : '<i class="fa-solid fa-chevron-up"></i>';
+      if (map) setTimeout(() => map.invalidateSize(), 200);
+    }
+    function initPlayerBar() {
+      if (window.innerWidth <= 768) togglePlayerBar(false);
+      else togglePlayerBar(true);
+    }
+
+    // ===== 手機版：風獅爺清單側滑抽屜 + 地圖/列表切換相容 =====
+    function toggleDrawer(open) {
+      const c = document.getElementById('dropArea');
+      const willOpen = typeof open === 'boolean' ? open : !c.classList.contains('drawer-open');
+      c.classList.toggle('drawer-open', willOpen);
+      // 相容舊分頁狀態
+      c.classList.toggle('list-mode', willOpen);
+      c.classList.toggle('map-mode', !willOpen);
+      const tm = document.getElementById('tabMap'), tl = document.getElementById('tabList');
+      if (tm) tm.classList.toggle('active', !willOpen);
+      if (tl) tl.classList.toggle('active', willOpen);
+      if (map) setTimeout(() => map.invalidateSize(), 300);
+    }
     function setMobileView(mode) {
       if (window.innerWidth > 768) return;
-      const c = document.getElementById('dropArea');
-      c.classList.toggle('map-mode', mode !== 'list');
-      c.classList.toggle('list-mode', mode === 'list');
-      document.getElementById('tabMap').classList.toggle('active', mode !== 'list');
-      document.getElementById('tabList').classList.toggle('active', mode === 'list');
-      if (map) setTimeout(() => map.invalidateSize(), 250);
+      toggleDrawer(mode === 'list');
     }
     function fitAllMarkers() {
       const group = Object.values(markers);
       if (group.length > 0) map.fitBounds(L.featureGroup(group).getBounds().pad(0.1));
     }
     function initMobileUI() {
-      setMobileView('map');
-      const handle = document.getElementById('sheetHandle');
+      const c = document.getElementById('dropArea');
+      c.classList.add('map-mode');
+      c.classList.remove('drawer-open', 'list-mode');
+      const tm = document.getElementById('tabMap'), tl = document.getElementById('tabList');
+      if (tm) tm.classList.add('active');
+      if (tl) tl.classList.remove('active');
+      initPlayerBar();
+      // 側滑手勢：地圖左緣右滑開啟、抽屜左滑關閉
+      const mapEl = document.getElementById('map');
       const sidebar = document.getElementById('sidebar');
-      let startY = 0, startH = 0, dragging = false;
-      handle.addEventListener('pointerdown', e => {
-        if (window.innerWidth > 768) return;
-        dragging = true; startY = e.clientY; startH = sidebar.getBoundingClientRect().height;
-        handle.setPointerCapture(e.pointerId);
-      });
-      handle.addEventListener('pointermove', e => {
-        if (!dragging) return;
-        const dh = startY - e.clientY;
-        const total = document.getElementById('dropArea').getBoundingClientRect().height;
-        let pct = ((startH + dh) / total) * 100;
-        pct = Math.max(20, Math.min(85, pct));
-        sidebar.style.height = pct + '%';
-      });
-      handle.addEventListener('pointerup', () => {
-        dragging = false; sidebar.style.height = '';
-        if (map) setTimeout(() => map.invalidateSize(), 200);
-      });
-      handle.addEventListener('click', () => {
-        const c = document.getElementById('dropArea');
-        setMobileView(c.classList.contains('list-mode') ? 'map' : 'list');
-      });
+      let sx = 0, sy = 0;
+      mapEl.addEventListener('touchstart', e => {
+        if (window.innerWidth > 768 || e.touches.length !== 1) return;
+        sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+      }, { passive: true });
+      mapEl.addEventListener('touchend', e => {
+        if (window.innerWidth > 768 || sx === 0) return;
+        const dx = e.changedTouches[0].clientX - sx;
+        const dy = e.changedTouches[0].clientY - sy;
+        if (sx < 28 && dx > 60 && Math.abs(dy) < 50) toggleDrawer(true);
+        sx = 0;
+      }, { passive: true });
+      let ssx = 0, ssy = 0;
+      sidebar.addEventListener('touchstart', e => {
+        if (window.innerWidth > 768 || e.touches.length !== 1) return;
+        ssx = e.touches[0].clientX; ssy = e.touches[0].clientY;
+      }, { passive: true });
+      sidebar.addEventListener('touchend', e => {
+        if (window.innerWidth > 768 || ssx === 0) return;
+        const dx = e.changedTouches[0].clientX - ssx;
+        const dy = e.changedTouches[0].clientY - ssy;
+        if (dx < -60 && Math.abs(dy) < 80) toggleDrawer(false);
+        ssx = 0;
+      }, { passive: true });
       window.addEventListener('resize', () => { if (map) map.invalidateSize(); });
     }
 
     // ===== 導覽播放器：一男一女騎機車・運動軌跡式導航 =====
     // 順序播放 30 站；多照片站以拼貼呈現（一張主圖＋其餘副圖，點副圖可切換主圖）
-    const tour = { playing: false, idx: 0, speed: 1, timer: null, raf: null, mainPhotoIdx: 0, reqSeq: 0, animId: 0, arrived: true };
+    const tour = { playing: false, idx: 0, speed: 1, timer: null, raf: null, mainPhotoIdx: 0, reqSeq: 0, animId: 0, arrived: true, finished: false };
     const TRAVEL_MS = 2200; // 機車跑每一條線的固定時間（1x 時；與距離無關，每腿相同）
     const DWELL_MS = 1200;  // 抵達後停留展示時間（1x 時）
     const TRAIL_OPACITY = [0.95, 0.5, 0.22]; // 當前腿 t、t-1、t-2 漸近淡出；t-3 以前不顯示
@@ -1148,8 +1211,11 @@
       if (lb) lb.textContent = `${tour.idx + 1} / ${tourStops().length}`;
     }
     function updatePlayBtn() {
+      const icon = tour.playing ? '<i class="fa-solid fa-pause"></i>' : '<i class="fa-solid fa-play"></i>';
       const b = document.getElementById('playBtn');
-      if (b) b.innerHTML = tour.playing ? '<i class="fa-solid fa-pause"></i>' : '<i class="fa-solid fa-play"></i>';
+      if (b) b.innerHTML = icon;
+      const m = document.getElementById('playBtnMini');
+      if (m) m.innerHTML = icon;
     }
     // Q版簡易圖示：一男（前・藍衣短髮）一女（後・粉衣馬尾）共乘一台機車
     function scooterIcon(stop, flipWest) {
@@ -1416,6 +1482,7 @@
       tour.idx = Math.max(0, Math.min(list.length - 1, i));
       tour.mainPhotoIdx = 0;
       tour.arrived = false;
+      tour.finished = false;
       const stop = list[tour.idx];
       document.getElementById('tourStopName').textContent = `🛵 ${stop.stop_number} ${stop.name}`;
       tourSliderSync();
@@ -1487,6 +1554,7 @@
     function startTour() {
       if (!map) return;
       if (!scooterMarker) buildTourRoute();
+      if (tour.finished) { tour.idx = 0; tour.finished = false; } // 播完後再按播放：從頭開始
       tour.playing = true;
       updatePlayBtn();
       showTourStop(tour.idx, { instant: false });
@@ -1495,7 +1563,7 @@
         const list = tourStops();
         if (tour.idx >= list.length - 1) {
           if (document.getElementById('loopChk') && document.getElementById('loopChk').checked) showTourStop(0);
-          else { pauseTour(); return; }
+          else { tour.finished = true; pauseTour(); return; }
         } else showTourStop(tour.idx + 1);
       }, (TRAVEL_MS + DWELL_MS) / tour.speed);
     }
