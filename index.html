@@ -78,7 +78,7 @@
     .popup-link { flex: 1; text-align: center; padding: 5px 3px; background: #2563eb; color: white; text-decoration: none; border-radius: 4px; font-size: 0.68rem; font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 3px; }
     .leaflet-control-layers { border-radius: 8px !important; box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important; font-size: 0.8rem !important; }
     .drop-overlay { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(37,99,235,0.88); color: white; z-index: 9999; justify-content: center; align-items: center; flex-direction: column; gap: 12px; font-size: 1.15rem; font-weight: 600; }
-    /* ===== 導覽播放器：一男一女騎機車軌跡導航 ===== */
+    /* ===== 導覽播放器：風獅爺巡禮 ===== */
     #map { position: relative; }
     /* 照片資訊卡：錨定在對應站點旗標正上方，機車移動時不跟著走；抵達時地圖將其置中 */
     .tour-popup .leaflet-popup-content-wrapper { border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 6px 24px rgba(0,0,0,0.3); }
@@ -264,7 +264,7 @@
             <label><input type="checkbox" id="followChk" checked> 跟隨</label>
             <label><input type="checkbox" id="routeChk" checked onchange="toggleRouteLine(this.checked)" title="顯示/隱藏軌跡線"> 軌跡</label>
             <label><input type="checkbox" id="loopChk"> 循環</label>
-            <span id="tourStopName">🛵 一男一女・機車環島導覽</span>
+            <span id="tourStopName">🛵 風獅爺巡禮</span>
           </div>
         </div>
         </div>
@@ -1304,7 +1304,7 @@
       window.addEventListener('resize', () => { if (map) map.invalidateSize(); });
     }
 
-    // ===== 導覽播放器：一男一女騎機車・運動軌跡式導航 =====
+    // ===== 導覽播放器：風獅爺巡禮 =====
     // 順序播放 37 站；多照片站以拼貼呈現（一張主圖＋其餘副圖，點副圖可切換主圖）
     const tour = { playing: false, idx: 0, speed: 1, timer: null, raf: null, mainPhotoIdx: 0, reqSeq: 0, animId: 0, arrived: true, finished: false };
     const TRAVEL_MS = 2200; // 機車跑每一條線的固定時間（1x 時；與距離無關，每腿相同）
