@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>金門風獅爺巡禮</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script>
   <style>
@@ -33,6 +34,25 @@
     #drawerClose { display: none; }
     .main-container { display: flex; flex: 1; height: calc(100vh - 52px); position: relative; }
     #map { flex: 1; height: 100%; z-index: 1; }
+    #map3d { position: absolute; inset: 0; z-index: 2; display: none; }
+    #map3d.show { display: block; z-index: 500; }
+    /* three.js 3D 指示物疊加層：透明畫布，蓋在地形上、彈窗下 */
+    #threeOverlay { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+    #threeOverlay canvas { width: 100% !important; height: 100% !important; display: block; }
+    #map3d .maplibregl-popup { z-index: 5; }
+    #map3d .maplibregl-popup-content { border-radius: 12px; padding: 10px 12px; width: 300px; box-shadow: 0 6px 24px rgba(0,0,0,0.3); }
+    /* ===== 3D 風獅爺旗標：顏色沿用 getRainbowColor，造型改 3D 石獅底座 ===== */
+    .lion3d { display: flex; flex-direction: column; align-items: center; pointer-events: auto; cursor: pointer; }
+    .lion3d-body { position: relative; width: 40px; height: 46px; display: flex; align-items: flex-end; justify-content: center; }
+    .lion3d-pedestal { position: absolute; bottom: 0; width: 34px; height: 14px; border-radius: 3px; transform: perspective(120px) rotateX(38deg); box-shadow: 0 4px 6px rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.55); }
+    .lion3d-lion { position: absolute; bottom: 9px; font-size: 26px; line-height: 1; filter: drop-shadow(0 3px 2px rgba(0,0,0,0.45)); transform: perspective(200px) rotateX(8deg); }
+    .lion3d-num { position: absolute; top: -8px; right: -10px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; color: white; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.4); }
+    .lion3d-shadow { width: 30px; height: 6px; border-radius: 50%; background: rgba(0,0,0,0.28); margin-top: -1px; filter: blur(1px); }
+    /* ===== 3D 雙人機車：立體漸層車體＋陰影 ===== */
+    .scoot3d-wrap { display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+    .scoot3d-shadow { width: 56px; height: 9px; border-radius: 50%; background: rgba(0,0,0,0.3); filter: blur(2px); margin-top: -4px; }
+    .scoot3d-svg { animation: scoot3d-bob 0.7s ease-in-out infinite; transform: perspective(300px) rotateX(12deg); }
+    @keyframes scoot3d-bob { 0%,100% { translate: 0 0; } 50% { translate: 0 -3px; } }
     #sidebar { width: 390px; background: white; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; height: 100%; z-index: 10; box-shadow: -2px 0 6px rgba(0,0,0,0.05); }
     .filter-bar { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; background: #f1f5f9; display: flex; gap: 5px; flex-wrap: wrap; }
     .filter-btn { padding: 3px 8px; border-radius: 12px; border: 1px solid #cbd5e1; background: white; font-size: 0.75rem; cursor: pointer; color: #475569; transition: all 0.2s; }
@@ -208,6 +228,7 @@
     }
     /* 導覽播放器 RWD：手機上縮小游標上的照片卡、播放器貼齊地圖底部 */
     @media (max-width: 768px) {
+      #map3d .maplibregl-popup-content { width: min(250px, 68vw); }
       .tour-popup .leaflet-popup-content { width: min(250px, 68vw) !important; }
       .tp-main-v { height: 128px; }
       .tp-main-v.tall { height: 190px; }
@@ -225,6 +246,7 @@
     <h1><i class="fa-solid fa-flag"></i> 金門風獅爺巡禮</h1>
     <button class="btn icon-only" id="menuToggle" onclick="document.querySelector('.header-actions').classList.toggle('open')" title="功能選單"><i class="fa-solid fa-bars"></i></button>
     <div class="header-actions">
+      <button class="btn icon-only" id="modeToggle" onclick="toggleMapMode()" title="切換 2D / 3D 地形"><i class="fa-solid fa-mountain" id="modeToggleIcon"></i></button>
       <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none;" onchange="handleFiles(this.files)">
       <button class="btn btn-primary icon-only" onclick="document.getElementById('folderInput').click()" title="匯入照片自動定位 GPS">
         <i class="fa-solid fa-folder-open"></i>
@@ -235,6 +257,7 @@
 
   <div class="main-container" id="dropArea">
     <div id="map">
+      <div id="map3d"></div>
       <!-- 播放器：可展開/收合；手機版預設收合 -->
       <div id="playerBar">
         <div class="player-header">
@@ -300,6 +323,8 @@
   </nav>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js"></script>
   <script>
     // 37 個風獅爺整合站點資料
     const stopsData = [
@@ -1017,6 +1042,7 @@
           markers[stop.stop_id] = marker;
         }
       });
+      if (typeof map3dReady !== 'undefined' && map3dReady) renderMarkers3D();
     }
 
     function renderList() {
@@ -1056,6 +1082,12 @@
     function focusStop(stop) {
       highlightCard(stop.stop_id);
       if (window.innerWidth <= 768) setMobileView('map');
+      if (is3D && map3dReady && stop.lat && stop.lng) {
+        if (!map3d) toggleMapMode(true);
+        openPopup3D(stop);
+        fly3DCinematic(stop, null);
+        return;
+      }
       if (stop.lat && stop.lng && markers[stop.stop_id]) {
         map.flyTo([stop.lat, stop.lng], 16, { duration: 1 });
         markers[stop.stop_id].openPopup();
@@ -1263,6 +1295,13 @@
     function fitAllMarkers() {
       const group = Object.values(markers);
       if (group.length > 0) map.fitBounds(L.featureGroup(group).getBounds().pad(0.1));
+      if (typeof map3dReady !== 'undefined' && map3dReady && is3D) {
+        const pts = tourStops().filter(s => s.lat && s.lng).map(s => [s.lng, s.lat]);
+        if (pts.length) {
+          const b = pts.reduce((a, p) => a.extend(p), new maplibregl.LngLatBounds(pts[0], pts[0]));
+          map3d.fitBounds(b, { padding: 60, pitch: 62, duration: 1500 });
+        }
+      }
     }
     function initMobileUI() {
       const c = document.getElementById('dropArea');
@@ -1307,6 +1346,9 @@
     const tour = { playing: false, idx: 0, speed: 1, timer: null, raf: null, mainPhotoIdx: 0, reqSeq: 0, animId: 0, arrived: true, finished: false };
     const TRAVEL_MS = 2200; // 機車跑每一條線的固定時間（1x 時；與距離無關，每腿相同）
     const DWELL_MS = 1200;  // 抵達後停留展示時間（1x 時）
+    const TEMPO3D = 2;      // 3D 版行進＋停留皆為 2D 的 2 倍時長
+    function travelMs() { return TRAVEL_MS * (typeof is3D !== 'undefined' && is3D ? TEMPO3D : 1) / tour.speed; }
+    function legIntervalMs() { return (TRAVEL_MS + DWELL_MS) * (typeof is3D !== 'undefined' && is3D ? TEMPO3D : 1) / tour.speed; }
     const TRAIL_OPACITY = [0.95, 0.5, 0.22]; // 當前腿 t、t-1、t-2 漸近淡出；t-3 以前不顯示
     const TRAIL_POPUP_TIP = 42; // 照片卡尖端高出站點旗標錨點的像素（旗標高32px＋10px空隙；獨立 popup offset）
     let trailStatic = null, trailLive = null, scooterMarker = null, tourPopup = null;
@@ -1486,6 +1528,7 @@
       legs.forEach((j, rank) => {
         if (j >= 0 && list[j] && list[j + 1]) drawStopLeg(trailStatic, list[j], list[j + 1], 1, TRAIL_OPACITY[rank]);
       });
+      if (typeof map3dReady !== 'undefined' && map3dReady) drawTrailStatic3D();
     }
     function buildTourRoute() {
       if (!map) return;
@@ -1503,6 +1546,7 @@
       } else { map.closePopup(tourPopup); }
       scooterMarker = L.marker([list[0].lat, list[0].lng], { icon: scooterIcon(list[0], false), zIndexOffset: 1000, interactive: false }).addTo(map);
       drawTrailStatic(0, false);
+      if (typeof map3dReady !== 'undefined' && map3dReady) { syncScooter3DToCurrent(false); drawTrailStatic3D(); }
       prefetchAllLegs();
     }
     function toggleRouteLine(on) {
@@ -1555,12 +1599,14 @@
       tourPopup.setLatLng([stop.lat, stop.lng]);
       if (!map.hasLayer(tourPopup)) tourPopup.openOn(map);
       tourCardPopIn();
+      if (typeof map3dReady !== 'undefined' && map3dReady) openPopup3D(stop);
     }
     function swapTourMainPopup(i) {
       const stop = tourStops()[tour.idx];
       if (!stop || !tourPopup) return;
       tour.mainPhotoIdx = i;
       tourPopup.setContent(tourPopupHtml(stop)); // 只換照片，不搬動地圖
+      if (typeof popup3d !== 'undefined' && popup3d && typeof map3dReady !== 'undefined' && map3dReady && is3D) popup3d.setHTML(tourPopupHtml(stop));
     }
     function openTourMain() {
       const stop = tourStops()[tour.idx];
@@ -1568,6 +1614,11 @@
     }
     // 抵達時移動地圖，把站點旗標上方的照片資訊卡置於畫面正中間
     function centerTourPopup() {
+      if (is3D && map3dReady) {
+        const stop = tourStops()[tour.idx];
+        if (stop && stop.lat) fly3DCinematic(stop, tourStops()[Math.max(0, tour.idx - 1)]);
+        return;
+      }
       if (!map || !tourPopup || !map.hasLayer(tourPopup)) return;
       const stop = tourStops()[tour.idx];
       if (!stop || !stop.lat || !stop.lng) return;
@@ -1613,6 +1664,10 @@
           if (tourPopup) tourPopup.setLatLng(to);
           if (trailLive) trailLive.clearLayers();
           drawTrailStatic(tour.idx, true);
+          if (typeof map3dReady !== 'undefined' && map3dReady) {
+            syncScooter3DToCurrent(false);
+            if (map3d.getSource('tour-live')) map3d.getSource('tour-live').setData({ type: 'FeatureCollection', features: [] });
+          }
           if (isFollowOn()) centerTourPopup();
           if (fromStop && fromStop !== stop) ensureLegGeom(fromStop, stop); // 背景預取，轉完整道路線
         } else {
@@ -1623,7 +1678,7 @@
           // 等導航軌跡（最多 2 秒，逾時先用直線出發；快取命中後即全程走道路）
           ensureLegGeom(fromStop, stop, 2000).then((path) => {
             if (myReq !== tour.reqSeq) return;
-            animateScooter(path, cA, cB, TRAVEL_MS / tour.speed, stop, flip);
+            animateScooter(path, cA, cB, travelMs(), stop, flip);
           });
         }
       }
@@ -1647,15 +1702,28 @@
           lastDraw = now;
           trailLive.clearLayers();
           drawGradientPath(trailLive, pathPts, cA, cB, k, TRAIL_OPACITY[0]);
+          if (typeof map3dReady !== 'undefined' && map3dReady && is3D) drawLive3D(pathPts, k, hslStr(cB));
         }
-        if (isFollowOn() && !map.getBounds().pad(-0.15).contains(pos)) map.panTo(pos, { animate: true });
+        // 3D 跟隨運鏡：機車朝向＋低空追蹤，比 2D 更動態
+        if (typeof map3dReady !== 'undefined' && map3dReady && is3D && isFollowOn() && total) {
+          const ahead = pointAtPath(pathPts, cum, total, Math.min(1, k + 0.02));
+          const hdg = bearingBetween([pos[0], pos[1]], [ahead[0], ahead[1]]);
+          if (threeOK && threeScene) {
+            const sc = ensureThreeScoot();
+            sc.lng = pos[1]; sc.lat = pos[0];
+            sc.rel = hdg - map3d.getBearing(); // 螢幕上向對應的相對方位
+          } else if (scooter3d) scooter3d.setLngLat([pos[1], pos[0]]);
+          if (now - (followCam3D._t || 0) > 450) { followCam3D._t = now; followCam3D(pos, hdg); }
+        }
+        if (isFollowOn() && !map.getBounds().pad(-0.15).contains(pos) && !is3D) map.panTo(pos, { animate: true });
         if (k < 1) { tour.raf = requestAnimationFrame(step); return; }
         tour.raf = null;
         tour.arrived = true;
         if (trailLive) trailLive.clearLayers();
+        if (typeof map3dReady !== 'undefined' && map3dReady && is3D && map3d.getSource('tour-live')) map3d.getSource('tour-live').setData({ type: 'FeatureCollection', features: [] });
         drawTrailStatic(tour.idx, true); // 抵達：當前腿完整入列，t-3 以前的不留
         openTourPopup(stopB); // 抵達：換下一張卡片並彈跳跳出
-        if (isFollowOn()) centerTourPopup(); // 抵達：移動地圖讓照片資訊置中
+        if (isFollowOn()) centerTourPopup(); // 抵達：移動地圖讓照片資訊置中（3D 為環繞運鏡）
       };
       tour.raf = requestAnimationFrame(step);
     }
@@ -1667,20 +1735,25 @@
       tour.playing = true;
       updatePlayBtn();
       showTourStop(tour.idx, { instant: false });
+      restartTourTimer();
+    }
+    function restartTourTimer() {
       clearTourTimer();
+      if (!tour.playing) return;
       tour.timer = setInterval(() => {
         const list = tourStops();
         if (tour.idx >= list.length - 1) {
           if (document.getElementById('loopChk') && document.getElementById('loopChk').checked) showTourStop(0);
           else { tour.finished = true; pauseTour(); return; }
         } else showTourStop(tour.idx + 1);
-      }, (TRAVEL_MS + DWELL_MS) / tour.speed);
+      }, legIntervalMs());
     }
     function pauseTour() { tour.playing = false; ++tour.animId; clearTourTimer(); if (tour.raf) { cancelAnimationFrame(tour.raf); tour.raf = null; } updatePlayBtn(); }
     function togglePlay() { tour.playing ? pauseTour() : startTour(); }
     function stopTour() {
       pauseTour();
       if (map && tourPopup && map.hasLayer(tourPopup)) tourCardRetract(() => { if (map) map.closePopup(tourPopup); });
+      if (typeof popup3d !== 'undefined' && popup3d) { try { popup3d.remove(); } catch (e) {} }
     }
     function stepTour(d) {
       const wasPlaying = tour.playing;
@@ -1707,6 +1780,478 @@
       tourSliderSync();
       updatePlayBtn();
     };
+
+    // ===== 3D 地形圖（MapLibre + DEM 地形）：導覽播放共用同一 tour 狀態 =====
+    let is3D = false, map3d = null, map3dReady = false, markers3d = {}, scooter3d = null, popup3d = null;
+    function toggleMapMode(force) {
+      is3D = typeof force === 'boolean' ? force : !is3D;
+      const el = document.getElementById('map3d');
+      if (el) el.classList.toggle('show', is3D);
+      const ic = document.getElementById('modeToggleIcon');
+      if (ic) ic.className = is3D ? 'fa-solid fa-map' : 'fa-solid fa-mountain';
+      const btn = document.getElementById('modeToggle');
+      if (btn) btn.title = is3D ? '切換回 2D 平面圖' : '切換 3D 地形圖';
+      if (is3D && !map3d) initMap3D();
+      if (is3D && map3dReady) {
+        if (threeOK && !threeR) initThreeOverlay();
+        if (typeof camSmooth !== 'undefined') camSmooth.b = null; // 切換模式重置平滑狀態
+        renderMarkers3D();
+        syncScooter3DToCurrent(true);
+        const stop = tourStops()[tour.idx];
+        if (stop) { openPopup3D(stop); fly3DCinematic(stop, null); }
+        if (tour.playing) restartTourTimer(); // 2D/3D 節奏不同（3D 為 2 倍時長）
+      } else if (!is3D && map) {
+        setTimeout(() => map.invalidateSize(), 200);
+        if (tour.playing) restartTourTimer(); // 切回 2D 節奏
+      }
+    }
+    function map3dStyle() {
+      return {
+        version: 8,
+        sources: {
+          'esri-sat': { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 19, attribution: '© Esri World Imagery' },
+          'esri-ref': { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 19 },
+          'terrain-dem': { type: 'raster-dem', url: 'https://demotiles.maplibre.org/terrain-tiles/tiles.json', tileSize: 256, maxzoom: 15 }
+        },
+        layers: [
+          { id: 'sat', type: 'raster', source: 'esri-sat' },
+          { id: 'ref', type: 'raster', source: 'esri-ref' }
+        ],
+        terrain: { source: 'terrain-dem', exaggeration: 1.5 },
+        sky: { 'sky-color': '#7db8ff', 'horizon-color': '#ffffff', 'fog-color': '#dfe9f5', 'fog-ground-blend': 0.6, 'horizon-fog-blend': 0.5, 'sky-horizon-blend': 0.4 }
+      };
+    }
+    function initMap3D() {
+      if (map3d || typeof maplibregl === 'undefined') return;
+      map3d = new maplibregl.Map({ container: 'map3d', style: map3dStyle(), center: [118.375, 24.448], zoom: 11.4, pitch: 62, bearing: -12, antialias: true });
+      map3d.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+      map3d.on('load', () => {
+        map3dReady = true;
+        ensureTrail3D();
+        initThreeOverlay();
+        renderMarkers3D();
+        syncScooter3DToCurrent(true);
+        drawTrailStatic3D();
+      });
+    }
+    // CSS 備援標記（THREE 載入失敗時使用）：底座＋獅子 emoji＋站號，底座色沿用 2D 彩虹色
+    function lion3dEl(stop) {
+      const color = getRainbowColor(stop.stop_id);
+      const el = document.createElement('div');
+      el.className = 'lion3d';
+      el.innerHTML = `<div class="lion3d-body">`
+        + `<div class="lion3d-pedestal" style="background:linear-gradient(180deg, ${color}, ${color} 55%, rgba(0,0,0,0.45));"></div>`
+        + `<div class="lion3d-lion">🦁</div>`
+        + `<div class="lion3d-num" style="background:${color};">${stop.stop_id}</div>`
+        + `</div><div class="lion3d-shadow"></div>`;
+      el.title = `${stop.stop_number} ${stop.name}`;
+      el.onclick = () => { highlightCard(stop.stop_id); openPopup3D(stop); fly3DCinematic(stop, null); if (window.innerWidth <= 768) setMobileView('map'); };
+      return el;
+    }
+    // CSS 備援機車（THREE 載入失敗時使用）：一男（前・藍衣）一女（後・粉衣）
+    function scoot3dEl() {
+      const el = document.createElement('div');
+      el.className = 'scoot3d-wrap';
+      el.innerHTML = `<svg class="scoot3d-svg" width="76" height="56" viewBox="0 0 76 58">`
+        + `<defs>`
+        + `<linearGradient id="g3dbody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5eead4"/><stop offset="0.55" stop-color="#14b8a6"/><stop offset="1" stop-color="#0b5e56"/></linearGradient>`
+        + `<linearGradient id="g3dskin" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe4c8"/><stop offset="1" stop-color="#eab68a"/></linearGradient>`
+        + `<linearGradient id="g3dblue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7aa8ff"/><stop offset="1" stop-color="#1e3fae"/></linearGradient>`
+        + `<linearGradient id="g3dpink" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff9ec7"/><stop offset="1" stop-color="#c2276b"/></linearGradient>`
+        + `</defs>`
+        + `<ellipse cx="38" cy="52" rx="27" ry="3.4" fill="rgba(0,0,0,0.18)"/>`
+        + `<circle cx="15" cy="44" r="8.5" fill="#0b1220"/><circle cx="15" cy="44" r="5" fill="#334155"/><circle cx="15" cy="44" r="2" fill="#cbd5e1"/>`
+        + `<circle cx="60" cy="44" r="8.5" fill="#0b1220"/><circle cx="60" cy="44" r="5" fill="#334155"/><circle cx="60" cy="44" r="2" fill="#cbd5e1"/>`
+        + `<path d="M12 42 L30 42 L35 28 L52 28 L61 42 L51 42 L47 33 L37 33 L32 42 Z" fill="url(#g3dbody)" stroke="#07332e" stroke-width="1.6" stroke-linejoin="round"/>`
+        + `<path d="M35 28 L52 28 L49 33 L37 33 Z" fill="rgba(255,255,255,0.4)"/>`
+        + `<rect x="27" y="24" width="23" height="5.6" rx="2.8" fill="#111c33"/>`
+        + `<line x1="52" y1="28" x2="58" y2="14" stroke="#111c33" stroke-width="3" stroke-linecap="round"/>`
+        + `<rect x="23" y="13" width="10.5" height="11.5" rx="3.4" fill="url(#g3dpink)"/>`
+        + `<circle cx="28.5" cy="7.5" r="6" fill="url(#g3dskin)"/>`
+        + `<path d="M22.5 6.5 Q23 1 28.5 1 Q34 1 34.5 6.5 Q32 4.2 28.5 4.2 Q25 4.2 22.5 6.5Z" fill="#7c2d12"/><circle cx="20.6" cy="8.6" r="2.8" fill="#7c2d12"/><line x1="23" y1="8" x2="23" y2="15" stroke="#7c2d12" stroke-width="2.4" stroke-linecap="round"/>`
+        + `<circle cx="26.8" cy="7.6" r="0.8" fill="#111827"/><circle cx="30.2" cy="7.6" r="0.8" fill="#111827"/>`
+        + `<rect x="37.5" y="13" width="11" height="11.5" rx="3.4" fill="url(#g3dblue)"/>`
+        + `<circle cx="43" cy="7.5" r="6" fill="url(#g3dskin)"/>`
+        + `<path d="M37 6.5 Q37.5 1 43 1 Q48.5 1 49 6.5 L47.2 5.4 Q43 3.6 38.8 5.4Z" fill="#111827"/>`
+        + `<circle cx="41.3" cy="7.6" r="0.8" fill="#111827"/><circle cx="44.7" cy="7.6" r="0.8" fill="#111827"/>`
+        + `</svg><div class="scoot3d-shadow"></div>`;
+      return el;
+    }
+    // ===== three.js 3D 指示物：石獅子風獅爺＋一男一女雙人機車（程序化建模）=====
+    // 透明疊加層＋單一透視相機（螢幕空間），每幀以 map3d.project 對齊經緯度；
+    // 站色沿用 getRainbowColor（顏色不變）；THREE 載入失敗自動退回 CSS 版標記。
+    let threeOK = (typeof THREE !== 'undefined');
+    let threeR = null, threeScene = null, threeCam = null, threeOverlay = null, threeStarted = false, threeRay = null;
+    let threeLions = new Map(), threeScoot = null;
+    const THREE_PX = { lion: 68, scoot: 80 };
+    const GEO = {};
+    function threeGeo(key, make) { if (!GEO[key]) GEO[key] = make(); return GEO[key]; }
+    function threeStd(color, extra) {
+      return new THREE.MeshStandardMaterial(Object.assign({ color: color, roughness: 0.78, metalness: 0.06 }, extra || {}));
+    }
+    function threeMesh(gkey, gmake, mat, x, y, z) {
+      const m = new THREE.Mesh(threeGeo(gkey, gmake), mat);
+      m.position.set(x || 0, y || 0, z || 0);
+      return m;
+    }
+    let MAT3 = null;
+    function threeMats() {
+      if (MAT3) return MAT3;
+      MAT3 = {
+        stone: threeStd(0xb9b3a6), stoneDark: threeStd(0x8d867a),
+        eye: threeStd(0x1a1a1a, { roughness: 0.35 }),
+        tire: threeStd(0x14181f, { roughness: 0.9 }), hub: threeStd(0x9aa3b2, { roughness: 0.4, metalness: 0.5 }),
+        teal: threeStd(0x14b8a6, { roughness: 0.45 }), seat: threeStd(0x1c2433, { roughness: 0.85 }),
+        metal: threeStd(0x5b6472, { roughness: 0.35, metalness: 0.6 }),
+        skin: threeStd(0xffcf9f), blue: threeStd(0x2563eb), pink: threeStd(0xec4899),
+        hairB: threeStd(0x2a1a12), hairK: threeStd(0x151515),
+        lamp: threeStd(0xfff3b0, { emissive: 0xffc94d, emissiveIntensity: 0.9 })
+      };
+      return MAT3;
+    }
+    let shadowTex3 = null;
+    function threeShadowBlob() {
+      if (!shadowTex3) {
+        const c = document.createElement('canvas'); c.width = c.height = 128;
+        const x = c.getContext('2d');
+        const gr = x.createRadialGradient(64, 64, 6, 64, 64, 60);
+        gr.addColorStop(0, 'rgba(0,0,0,0.42)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+        x.fillStyle = gr; x.fillRect(0, 0, 128, 128);
+        shadowTex3 = new THREE.CanvasTexture(c);
+      }
+      return new THREE.Mesh(threeGeo('blobPlane', () => new THREE.PlaneGeometry(1, 1)),
+        new THREE.MeshBasicMaterial({ map: shadowTex3, transparent: true, depthWrite: false }));
+    }
+    function threeBadge(num, css) {
+      const c = document.createElement('canvas'); c.width = c.height = 160;
+      const x = c.getContext('2d');
+      x.beginPath(); x.arc(80, 80, 62, 0, Math.PI * 2); x.fillStyle = css; x.fill();
+      x.lineWidth = 10; x.strokeStyle = '#ffffff'; x.stroke();
+      x.fillStyle = '#fff'; x.font = '800 72px system-ui, sans-serif';
+      x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.fillText(String(num), 80, 86);
+      const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4;
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+      sp.scale.set(0.85, 0.85, 1); sp.renderOrder = 50;
+      return sp;
+    }
+    // 石獅子風獅爺：站色石座＋蹲踞石獅（體／胸／前肢／頭／鬃毛／耳／吻／眼／尾），底面原點
+    function buildStoneLion(css) {
+      const M = threeMats();
+      const g = new THREE.Group();
+      const B = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+      const S = (r, a, b) => new THREE.SphereGeometry(r, a || 12, b || 10);
+      const ped = new THREE.Mesh(B(1.5, 0.42, 1.5), threeStd(new THREE.Color(css)));
+      ped.position.y = 0.21; g.add(ped);
+      const slab = new THREE.Mesh(B(1.66, 0.12, 1.66), threeStd(new THREE.Color(css).multiplyScalar(0.6)));
+      slab.position.y = 0.48; g.add(slab);
+      const y0 = 0.54;
+      g.add(threeMesh('lionHaunch', () => B(0.74, 0.62, 0.62), M.stone, 0, y0 + 0.31, -0.12));
+      g.add(threeMesh('lionChest', () => B(0.6, 0.72, 0.5), M.stone, 0, y0 + 0.42, 0.18));
+      [-0.2, 0.2].forEach(px => {
+        g.add(threeMesh('lionLeg', () => B(0.18, 0.5, 0.2), M.stone, px, y0 + 0.31, 0.36));
+        g.add(threeMesh('lionPaw', () => B(0.22, 0.13, 0.32), M.stoneDark, px, y0 + 0.1, 0.42));
+      });
+      g.add(threeMesh('lionHead', () => S(0.3), M.stone, 0, y0 + 1.08, 0.22));
+      // 鬃毛＋披風：與旗標（站色）同色
+      const maneMat = threeStd(new THREE.Color(css), { roughness: 0.85 });
+      const mane = threeMesh('lionMane', () => new THREE.CylinderGeometry(0.44, 0.52, 0.3, 12), maneMat, 0, y0 + 1.06, 0.0);
+      mane.rotation.x = Math.PI / 2; g.add(mane);
+      for (let i = 0; i < 8; i++) {
+        const a = i / 8 * Math.PI * 2;
+        g.add(threeMesh('lionKnob', () => S(0.09, 8, 6), maneMat, Math.cos(a) * 0.42, y0 + 1.06 + Math.sin(a) * 0.42, 0.02));
+      }
+      const capeMat = threeStd(new THREE.Color(css), { roughness: 0.9, side: THREE.DoubleSide });
+      const cape = new THREE.Mesh(
+        threeGeo('lionCape', () => new THREE.CylinderGeometry(0.36, 0.64, 1.05, 12, 1, true, Math.PI - 1.0, 2.0)),
+        capeMat);
+      cape.position.set(0, y0 + 0.72, -0.08); cape.rotation.x = 0.1; g.add(cape);
+      const collar = threeMesh('lionCollar', () => new THREE.TorusGeometry(0.3, 0.07, 8, 16), capeMat, 0, y0 + 1.26, 0.12);
+      collar.rotation.x = Math.PI / 2 - 0.3; g.add(collar);
+      [-0.2, 0.2].forEach(px => g.add(threeMesh('lionEar', () => new THREE.ConeGeometry(0.09, 0.18, 8), M.stone, px, y0 + 1.36, 0.2)));
+      g.add(threeMesh('lionSnout', () => B(0.27, 0.2, 0.2), M.stone, 0, y0 + 1.0, 0.48));
+      g.add(threeMesh('lionNose', () => B(0.1, 0.07, 0.06), M.eye, 0, y0 + 1.04, 0.59));
+      [-0.11, 0.11].forEach(px => g.add(threeMesh('lionEye', () => S(0.05, 8, 6), M.eye, px, y0 + 1.14, 0.46)));
+      const tail = threeMesh('lionTail', () => new THREE.CylinderGeometry(0.06, 0.09, 0.55, 8), M.stone, 0, y0 + 0.55, -0.45);
+      tail.rotation.x = 0.5; g.add(tail);
+      const sh = threeShadowBlob(); sh.scale.set(2.0, 2.0, 1); sh.position.y = 0.03; g.add(sh);
+      g.userData.h = 2.0;
+      return g;
+    }
+    // 雙人機車（朝＋X）：車輪／車體／前盾／座墊＋前座男子（藍衣短髮）＋後座女子（粉衣馬尾）
+    function buildScooter3D() {
+      const M = threeMats();
+      const g = new THREE.Group();
+      const B = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+      const S = (r, a, b) => new THREE.SphereGeometry(r, a || 12, b || 10);
+      const wheels = [];
+      [-0.85, 0.85].forEach(wx => {
+        const w = new THREE.Mesh(threeGeo('scootWheel', () => new THREE.CylinderGeometry(0.3, 0.3, 0.18, 18)), M.tire);
+        w.rotation.x = Math.PI / 2; w.position.set(wx, 0.3, 0); g.add(w); wheels.push(w);
+        const hub = new THREE.Mesh(threeGeo('scootHub', () => new THREE.CylinderGeometry(0.12, 0.12, 0.2, 12)), M.hub);
+        hub.rotation.x = Math.PI / 2; hub.position.set(wx, 0.3, 0); g.add(hub); wheels.push(hub);
+      });
+      g.add(threeMesh('scootFloor', () => B(1.0, 0.1, 0.34), M.seat, 0, 0.52, 0));
+      g.add(threeMesh('scootRear', () => B(0.72, 0.42, 0.4), M.teal, -0.55, 0.8, 0));
+      g.add(threeMesh('scootSeat', () => B(0.66, 0.14, 0.37), M.seat, -0.5, 1.06, 0));
+      const shield = threeMesh('scootShield', () => B(0.16, 0.82, 0.4), M.teal, 0.55, 0.92, 0);
+      shield.rotation.z = -0.22; g.add(shield);
+      const fork = threeMesh('scootFork', () => new THREE.CylinderGeometry(0.045, 0.045, 0.8, 8), M.metal, 0.72, 0.62, 0);
+      fork.rotation.z = -0.35; g.add(fork);
+      const bar = threeMesh('scootBar', () => new THREE.CylinderGeometry(0.035, 0.035, 0.52, 8), M.metal, 0.5, 1.34, 0);
+      bar.rotation.x = Math.PI / 2; g.add(bar);
+      g.add(threeMesh('scootLamp', () => S(0.08, 10, 8), M.lamp, 0.66, 1.16, 0));
+      const limb = (r1, r2, len, mat) => new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, len, 8), mat);
+      function rider(px, shirt, hairM, ponytail) {
+        const r = new THREE.Group();
+        const torso = new THREE.Mesh(threeGeo('riderTorso', () => new THREE.CapsuleGeometry(0.17, 0.36, 4, 10)), shirt);
+        torso.position.set(0, 0.62, 0); r.add(torso);
+        const head = new THREE.Mesh(threeGeo('riderHead', () => S(0.17)), M.skin);
+        head.position.set(0.02, 1.12, 0); r.add(head);
+        const hair = new THREE.Mesh(threeGeo('riderHair', () => new THREE.SphereGeometry(0.18, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.55)), hairM);
+        hair.position.set(0.0, 1.16, 0); r.add(hair);
+        if (ponytail) {
+          const pt = new THREE.Mesh(threeGeo('ponytail', () => new THREE.ConeGeometry(0.07, 0.34, 8)), hairM);
+          pt.position.set(-0.2, 0.98, 0); pt.rotation.z = 0.5; r.add(pt);
+        }
+        [-0.13, 0.13].forEach(pz => {
+          const arm = limb(0.05, 0.045, 0.5, shirt);
+          arm.position.set(0.28, 0.72, pz); arm.rotation.z = -1.15; r.add(arm);
+          const leg = limb(0.07, 0.06, 0.42, M.seat);
+          leg.position.set(0.12, 0.12, pz); leg.rotation.z = -1.35; r.add(leg);
+        });
+        r.position.set(px, 1.1, 0);
+        return r;
+      }
+      g.add(rider(0.02, M.blue, M.hairK, false));
+      g.add(rider(-0.55, M.pink, M.hairB, true));
+      const sh = threeShadowBlob(); sh.scale.set(2.6, 1.1, 1); sh.position.set(0, 0.03, 0); g.add(sh);
+      g.userData.h = 2.35; g.userData.wheels = wheels;
+      return g;
+    }
+    function initThreeOverlay() {
+      if (!threeOK || threeR || !map3d) return threeOK;
+      try {
+        const box = map3d.getContainer();
+        threeOverlay = document.createElement('div');
+        threeOverlay.id = 'threeOverlay';
+        box.insertBefore(threeOverlay, box.firstChild);
+        threeR = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+        threeR.setClearColor(0x000000, 0);
+        threeOverlay.appendChild(threeR.domElement);
+        threeScene = new THREE.Scene();
+        threeCam = new THREE.PerspectiveCamera(32, 1, 0.5, 600);
+        threeCam.position.set(0, 0, 120); threeCam.lookAt(0, 0, 0);
+        threeScene.add(new THREE.HemisphereLight(0xdff1ff, 0x8a7a5f, 0.95));
+        const sun = new THREE.DirectionalLight(0xffffff, 1.15);
+        sun.position.set(40, 60, 90); threeScene.add(sun);
+        const fill = new THREE.DirectionalLight(0xbcd2ff, 0.35);
+        fill.position.set(-50, -20, 60); threeScene.add(fill);
+        threeRay = new THREE.Raycaster();
+        sizeThreeOverlay();
+        map3d.on('resize', sizeThreeOverlay);
+        window.addEventListener('resize', sizeThreeOverlay);
+        map3d.on('click', threeClickPick);
+        if (!threeStarted) { threeStarted = true; requestAnimationFrame(threeTick); }
+      } catch (e) { console.warn('three.js 初始化失敗，退回 CSS 標記', e); threeOK = false; }
+      return threeOK;
+    }
+    function sizeThreeOverlay() {
+      if (!threeR || !map3d || !threeOverlay) return;
+      const r = map3d.getContainer().getBoundingClientRect();
+      threeR.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      threeR.setSize(r.width, r.height, false);
+      threeCam.aspect = r.width / Math.max(1, r.height);
+      threeCam.updateProjectionMatrix();
+      threeOverlay._w = r.width; threeOverlay._h = r.height;
+    }
+    function threeScaleFor(px, modelH, zoom) {
+      const h = (threeOverlay && threeOverlay._h) || 600;
+      const wpp = (2 * 120 * Math.tan(threeCam.fov * Math.PI / 360)) / h;
+      const zf = Math.pow(2, (zoom - 15.5) * 0.4);
+      return { s: (px * Math.max(0.5, Math.min(1.7, zf)) * wpp) / modelH, wpp: wpp };
+    }
+    function rebuildThreeLions() {
+      threeLions.forEach(o => threeScene.remove(o.group));
+      threeLions = new Map();
+      tourStops().filter(s => s.lat && s.lng && (currentFilter === 'ALL' || s.date === currentFilter))
+        .forEach(stop => {
+          const grp = buildStoneLion(getRainbowColor(stop.stop_id));
+          const badge = threeBadge(stop.stop_id, getRainbowColor(stop.stop_id));
+          badge.position.y = 2.45; grp.add(badge);
+          grp.traverse(o => { o.userData.stopId = stop.stop_id; });
+          threeScene.add(grp);
+          threeLions.set(stop.stop_id, { group: grp, stop: stop, phase: (stop.stop_id * 1.37) % 6.28, h: grp.userData.h });
+        });
+    }
+    function ensureThreeScoot() {
+      if (!threeScoot) {
+        const grp = buildScooter3D();
+        threeScene.add(grp);
+        threeScoot = { group: grp, h: grp.userData.h, lng: 118.375, lat: 24.448, rel: 90, yaw: 0, wheels: grp.userData.wheels };
+      }
+      return threeScoot;
+    }
+    function threeClickPick(e) {
+      if (!threeOK || !threeR || threeLions.size === 0 || !e.point) return;
+      const r = threeR.domElement.getBoundingClientRect();
+      threeRay.setFromCamera({
+        x: ((e.point.x - r.left) / r.width) * 2 - 1,
+        y: -((e.point.y - r.top) / r.height) * 2 + 1
+      }, threeCam);
+      const vis = [...threeLions.values()].filter(o => o.group.visible).map(o => o.group);
+      const hits = threeRay.intersectObjects(vis, true);
+      if (hits.length) {
+        const sid = hits[0].object.userData.stopId;
+        const stop = stopsData.find(s => s.stop_id === sid);
+        if (stop) { highlightCard(sid); openPopup3D(stop); fly3DCinematic(stop, null); if (window.innerWidth <= 768) setMobileView('map'); }
+      }
+    }
+    function threeTick() {
+      requestAnimationFrame(threeTick);
+      if (!is3D || !map3dReady || !threeOK || !threeR || !threeOverlay || !threeOverlay._w) return;
+      const w = threeOverlay._w, h = threeOverlay._h, cx = w / 2, cy = h / 2;
+      const zoom = map3d.getZoom(), t = performance.now() / 1000, m = 60;
+      threeLions.forEach(o => {
+        const p = map3d.project([o.stop.lng, o.stop.lat]);
+        if (p.x < -m || p.y < -m || p.x > w + m || p.y > h + m) { o.group.visible = false; return; }
+        o.group.visible = true;
+        const r = threeScaleFor(THREE_PX.lion, o.h, zoom);
+        o.group.scale.setScalar(r.s);
+        o.group.position.set((p.x - cx) * r.wpp, (cy - p.y) * r.wpp, p.y * 0.0004);
+        o.group.rotation.set(0, Math.sin(t * 0.5 + o.phase) * 0.45, 0);
+      });
+      if (threeScoot) {
+        const sc = threeScoot;
+        const p = map3d.project([sc.lng, sc.lat]);
+        if (p.x < -80 || p.y < -80 || p.x > w + 80 || p.y > h + 80) sc.group.visible = false;
+        else {
+          sc.group.visible = true;
+          const r = threeScaleFor(THREE_PX.scoot, sc.h, zoom);
+          sc.group.scale.setScalar(r.s);
+          sc.group.position.set((p.x - cx) * r.wpp, (cy - p.y) * r.wpp, 1);
+          const target = THREE.MathUtils.degToRad(90 - (((sc.rel % 360) + 360) % 360));
+          let d = target - sc.yaw;
+          while (d > Math.PI) d -= Math.PI * 2;
+          while (d < -Math.PI) d += Math.PI * 2;
+          sc.yaw += d * 0.12;
+          sc.group.rotation.set(0, sc.yaw, Math.sin(t * 7) * 0.02);
+          sc.group.position.y += Math.abs(Math.sin(t * 7)) * r.s * 0.05;
+          (sc.wheels || []).forEach(wh => {
+            wh.userData.spin = (wh.userData.spin || 0) + 0.3;
+            wh.rotation.set(Math.PI / 2, wh.userData.spin, 0);
+          });
+        }
+      }
+      threeR.render(threeScene, threeCam);
+    }
+    function renderMarkers3D() {
+      if (!map3dReady) return;
+      if (threeOK && threeScene) {
+        Object.values(markers3d).forEach(mk => mk.remove());
+        markers3d = {};
+        rebuildThreeLions();
+        return;
+      }
+      Object.values(markers3d).forEach(m => m.remove());
+      markers3d = {};
+      const list = tourStops().filter(s => s.lat && s.lng && (currentFilter === 'ALL' || s.date === currentFilter));
+      list.forEach(stop => {
+        const mk = new maplibregl.Marker({ element: lion3dEl(stop), anchor: 'bottom' }).setLngLat([stop.lng, stop.lat]).addTo(map3d);
+        markers3d[stop.stop_id] = mk;
+      });
+    }
+    function ensureTrail3D() {
+      if (!map3dReady || map3d.getSource('tour-trail')) return;
+      map3d.addSource('tour-trail', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map3d.addLayer({ id: 'tour-trail-line', type: 'line', source: 'tour-trail', paint: { 'line-color': ['get', 'color'], 'line-opacity': ['get', 'opacity'], 'line-width': 5, 'line-emissive-strength': 0.4 } });
+      map3d.addSource('tour-live', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map3d.addLayer({ id: 'tour-live-line', type: 'line', source: 'tour-live', paint: { 'line-color': ['get', 'color'], 'line-opacity': 0.95, 'line-width': 6 } });
+    }
+    function hslToCss(stopId) { const c = rainbowHSL(stopId); return `hsl(${Math.round(c.h)},${Math.round(c.s)}%,${Math.round(c.l)}%)`; }
+    function drawTrailStatic3D() {
+      if (!map3dReady) return;
+      ensureTrail3D();
+      const list = tourStops();
+      const legs = tour.arrived ? [tour.idx - 1, tour.idx - 2, tour.idx - 3] : [tour.idx - 2, tour.idx - 3];
+      const feats = [];
+      legs.forEach((j, rank) => {
+        if (j >= 0 && list[j] && list[j + 1] && list[j].lat && list[j + 1].lat) {
+          const pts = legPathSync(list[j], list[j + 1]).map(p => [p[1], p[0]]);
+          feats.push({ type: 'Feature', properties: { color: hslToCss(list[j + 1].stop_id), opacity: TRAIL_OPACITY[rank] || 0.2 }, geometry: { type: 'LineString', coordinates: pts } });
+        }
+      });
+      map3d.getSource('tour-trail').setData({ type: 'FeatureCollection', features: feats });
+      if (!tour.playing || tour.arrived) map3d.getSource('tour-live').setData({ type: 'FeatureCollection', features: [] });
+    }
+    function drawLive3D(pathPts, frac, cBcss) {
+      if (!map3dReady) return;
+      ensureTrail3D();
+      const cum = pathLengths(pathPts), total = cum[cum.length - 1] || 0;
+      const f = Math.max(0.0001, Math.min(1, frac));
+      const coords = [[pathPts[0][1], pathPts[0][0]]];
+      for (let i = 1; i < pathPts.length; i++) {
+        const t1 = total ? cum[i] / total : 1;
+        if (cum[i - 1] / total >= f) break;
+        if (t1 <= f) coords.push([pathPts[i][1], pathPts[i][0]]);
+        else {
+          const t0 = total ? cum[i - 1] / total : 0;
+          const u = (f - t0) / ((t1 - t0) || 1);
+          coords.push([pathPts[i - 1][1] + (pathPts[i][1] - pathPts[i - 1][1]) * u, pathPts[i - 1][0] + (pathPts[i][0] - pathPts[i - 1][0]) * u]);
+          break;
+        }
+      }
+      map3d.getSource('tour-live').setData({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: { color: cBcss }, geometry: { type: 'LineString', coordinates: coords } }] });
+    }
+    function bearingBetween(a, b) {
+      const toRad = d => d * Math.PI / 180, toDeg = r => r * 180 / Math.PI;
+      const dLng = toRad(b[1] - a[1]);
+      const y = Math.sin(dLng) * Math.cos(toRad(b[0]));
+      const x = Math.cos(toRad(a[0])) * Math.sin(toRad(b[0])) - Math.sin(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.cos(dLng);
+      return (toDeg(Math.atan2(y, x)) + 360) % 360;
+    }
+    function syncScooter3DToCurrent(jumpCam) {
+      if (!map3dReady) return;
+      const list = tourStops().filter(s => s.lat && s.lng);
+      if (!list.length) return;
+      const stop = list[Math.max(0, Math.min(tour.idx, list.length - 1))];
+      if (threeOK && threeScene) {
+        const sc = ensureThreeScoot();
+        sc.lng = stop.lng; sc.lat = stop.lat;
+        if (scooter3d) { try { scooter3d.remove(); } catch (e) {} scooter3d = null; }
+      } else if (!scooter3d) { scooter3d = new maplibregl.Marker({ element: scoot3dEl(), anchor: 'bottom' }).setLngLat([stop.lng, stop.lat]).addTo(map3d); }
+      else scooter3d.setLngLat([stop.lng, stop.lat]);
+      if (jumpCam && is3D) map3d.jumpTo({ center: [stop.lng, stop.lat], zoom: 15.5, pitch: 62 });
+    }
+    function openPopup3D(stop) {
+      if (!map3dReady || !is3D || !stop || !stop.lat) return;
+      if (!popup3d) popup3d = new maplibregl.Popup({ closeButton: false, closeOnClick: false, maxWidth: '320px', offset: 26 });
+      popup3d.setLngLat([stop.lng, stop.lat]).setHTML(tourPopupHtml(stop)).addTo(map3d);
+    }
+    // 平滑運鏡：抵達時依行進方位＋站號給不同 pitch／bearing／zoom，緩慢環繞取景
+    // bearing 平滑狀態由 follow 共用，避免跳動
+    const camSmooth = { b: null };
+    function smoothBearingTo(target) {
+      target = ((target % 360) + 360) % 360;
+      if (camSmooth.b === null) { camSmooth.b = target; return target; }
+      const d = ((target - camSmooth.b + 540) % 360) - 180;
+      camSmooth.b = ((camSmooth.b + d * 0.2 + 360) % 360);
+      return camSmooth.b;
+    }
+    function fly3DCinematic(stop, fromStop) {
+      if (!map3dReady || !is3D || !stop || !stop.lat) return;
+      let bearing = map3d.getBearing();
+      if (fromStop && fromStop.lat) bearing = bearingBetween([fromStop.lat, fromStop.lng], [stop.lat, stop.lng]);
+      const swing = ((stop.stop_id % 5) - 2) * 10; // -20 ~ +20° 依站錯開，避免每站同角度
+      const pitch = 62 + (stop.stop_id % 3) * 4;   // 62 / 66 / 70° 輪替俯角
+      camSmooth.b = ((bearing + swing % 360) + 360) % 360;
+      map3d.flyTo({ center: [stop.lng, stop.lat], zoom: 16.2, pitch, bearing: camSmooth.b, duration: 4400 / Math.sqrt(tour.speed), essential: true });
+    }
+    function followCam3D(pos, heading) {
+      if (!map3dReady || !is3D) return;
+      const b = smoothBearingTo(heading);
+      map3d.easeTo({ center: [pos[1], pos[0]], zoom: 16.4, pitch: 66, bearing: b, duration: 600 });
+    }
 
     window.onload = initMap;
   </script>
