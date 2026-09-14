@@ -80,7 +80,7 @@
     .drop-overlay { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(37,99,235,0.88); color: white; z-index: 9999; justify-content: center; align-items: center; flex-direction: column; gap: 12px; font-size: 1.15rem; font-weight: 600; }
     /* ===== 導覽播放器：一男一女騎機車軌跡導航 ===== */
     #map { position: relative; }
-    /* 照片資訊卡：綁在機車游標上，顯示於游標正上方；抵達時地圖將其置中 */
+    /* 照片資訊卡：錨定在對應站點旗標正上方，機車移動時不跟著走；抵達時地圖將其置中 */
     .tour-popup .leaflet-popup-content-wrapper { border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 6px 24px rgba(0,0,0,0.3); }
     .tour-popup .leaflet-popup-content { margin: 10px 12px; width: 300px !important; line-height: 1.4; }
     /* 漂亮卡牌風格：站點色漸層頭＋直式照片區（主上副下）＋輕快彈跳進出場 */
@@ -1200,7 +1200,7 @@
     const TRAVEL_MS = 2200; // 機車跑每一條線的固定時間（1x 時；與距離無關，每腿相同）
     const DWELL_MS = 1200;  // 抵達後停留展示時間（1x 時）
     const TRAIL_OPACITY = [0.95, 0.5, 0.22]; // 當前腿 t、t-1、t-2 漸近淡出；t-3 以前不顯示
-    const TRAIL_POPUP_TIP = 107; // 照片卡尖端高出機車錨點的像素（popupAnchor -62 ＋ popup offset -45）
+    const TRAIL_POPUP_TIP = 42; // 照片卡尖端高出站點旗標錨點的像素（旗標高32px＋10px空隙；獨立 popup offset）
     let trailStatic = null, trailLive = null, scooterMarker = null, tourPopup = null;
 
     function tourStops() { return [...stopsData].sort((a, b) => a.stop_id - b.stop_id); }
@@ -1217,12 +1217,11 @@
       const m = document.getElementById('playBtnMini');
       if (m) m.innerHTML = icon;
     }
-    // Q版簡易圖示：一男（前・藍衣短髮）一女（後・粉衣馬尾）共乘一台機車
+    // Q版簡易圖示：一男（前・藍衣短髮）一女（後・粉衣馬尾）共乘一台機車（不帶站名氣泡，避免資訊卡跟車走；站名由站點旗標上方的照片卡呈現）
     function scooterIcon(stop, flipWest) {
-      const label = stop ? `${stop.stop_number} ${stop.name}` : '🛵 導覽中';
       return L.divIcon({
         className: 'scooter-pin',
-        html: `<div class="scooter-wrap"><div class="scooter-bubble">${label}</div>`
+        html: `<div class="scooter-wrap">`
           + `<svg class="scooter-svg${flipWest ? ' flip' : ''}" width="62" height="46" viewBox="0 0 64 50">`
           + `<ellipse cx="32" cy="46" rx="24" ry="3" fill="rgba(0,0,0,0.18)"/>`
           + `<circle cx="14" cy="39" r="7" fill="#111827"/><circle cx="14" cy="39" r="2.6" fill="#9ca3af"/>`
@@ -1391,10 +1390,10 @@
       const show = document.getElementById('routeChk') ? document.getElementById('routeChk').checked : true;
       if (show) { trailStatic.addTo(map); trailLive.addTo(map); }
       if (!tourPopup) {
-        tourPopup = L.popup({ closeButton: false, autoPan: false, closeOnClick: false, className: 'tour-popup', offset: L.point(0, -45), maxWidth: 340, minWidth: 280 });
+        // 資訊卡為獨立 popup，錨定在站點旗標上，不綁定機車 marker
+        tourPopup = L.popup({ closeButton: false, autoPan: false, closeOnClick: false, className: 'tour-popup', offset: L.point(0, -42), maxWidth: 340, minWidth: 280 });
       } else { map.closePopup(tourPopup); }
       scooterMarker = L.marker([list[0].lat, list[0].lng], { icon: scooterIcon(list[0], false), zIndexOffset: 1000, interactive: false }).addTo(map);
-      scooterMarker.bindPopup(tourPopup);
       drawTrailStatic(0, false);
       prefetchAllLegs();
     }
@@ -1442,10 +1441,11 @@
       }, 300);
     }
     function openTourPopup(stop) {
-      if (!scooterMarker || !tourPopup) return;
+      if (!map || !tourPopup || !stop || !stop.lat || !stop.lng) return;
       tourPopup.setContent(tourPopupHtml(stop));
-      tourPopup.setLatLng(scooterMarker.getLatLng());
-      if (!map.hasLayer(tourPopup)) scooterMarker.openPopup();
+      // 錨定在對應站點旗標上，不跟機車走
+      tourPopup.setLatLng([stop.lat, stop.lng]);
+      if (!map.hasLayer(tourPopup)) tourPopup.openOn(map);
       tourCardPopIn();
     }
     function swapTourMainPopup(i) {
@@ -1458,13 +1458,16 @@
       const stop = tourStops()[tour.idx];
       if (stop && stop.photos[tour.mainPhotoIdx]) window.open(stop.photos[tour.mainPhotoIdx].viewUrl, '_blank');
     }
-    // 抵達時移動地圖，把游標上方的照片資訊卡置於畫面正中間
+    // 抵達時移動地圖，把站點旗標上方的照片資訊卡置於畫面正中間
     function centerTourPopup() {
-      if (!map || !scooterMarker || !tourPopup || !map.hasLayer(tourPopup)) return;
+      if (!map || !tourPopup || !map.hasLayer(tourPopup)) return;
+      const stop = tourStops()[tour.idx];
+      if (!stop || !stop.lat || !stop.lng) return;
+      const stopLatLng = L.latLng(stop.lat, stop.lng);
       requestAnimationFrame(() => {
         const wrap = document.querySelector('.tour-popup .leaflet-popup-content-wrapper');
         const H = wrap ? wrap.offsetHeight : 330;
-        const mp = map.latLngToContainerPoint(scooterMarker.getLatLng());
+        const mp = map.latLngToContainerPoint(stopLatLng);
         const popupCenter = mp.subtract(L.point(0, TRAIL_POPUP_TIP + H / 2));
         map.panTo(map.containerPointToLatLng(popupCenter), { animate: true, duration: 0.8 });
       });
@@ -1488,7 +1491,7 @@
       tourSliderSync();
       highlightCard(stop.stop_id);
       if (opts.instant) openTourPopup(stop); // 手動跳站：直接換卡彈出
-      // 自動行進：出發時保留上一站卡片，中途收起、抵達才彈出下一張
+      // 自動行進：卡片留在原站點旗標上方不動，抵達才彈出下一站內容
       if (stop.lat && stop.lng) {
         const from = scooterMarker.getLatLng();
         const to = L.latLng(stop.lat, stop.lng);
@@ -1499,7 +1502,7 @@
           tour.arrived = true;
           scooterMarker.setLatLng(to);
           scooterMarker.setIcon(scooterIcon(stop, flip));
-          tourPopup.setLatLng(to);
+          if (tourPopup) tourPopup.setLatLng(to);
           if (trailLive) trailLive.clearLayers();
           drawTrailStatic(tour.idx, true);
           if (isFollowOn()) centerTourPopup();
@@ -1517,23 +1520,21 @@
         }
       }
     }
-    // 機車沿導航路徑以弧長勻速推進：每條腿固定 TRAVEL_MS（與距離無關），逐幀更新位置＋漸進色生長＋popup 跟隨
+    // 機車沿導航路徑以弧長勻速推進：每條腿固定 TRAVEL_MS（與距離無關），逐幀更新位置＋漸進色生長；資訊卡固定在站點旗標上不跟車
     function animateScooter(pathPts, cA, cB, durMs, stopB, flip) {
       if (tour.raf) { cancelAnimationFrame(tour.raf); tour.raf = null; }
       if (!scooterMarker) return;
       const myAnim = ++tour.animId;
       scooterMarker.setIcon(scooterIcon(stopB, flip));
+      // 行進間不碰資訊卡：卡片繼續留在原站點旗標上方，抵達才換新站內容
       const cum = pathLengths(pathPts), total = cum[cum.length - 1] || 0;
       const t0 = performance.now();
       let lastDraw = 0;
-      let cardRetracted = false; // 本腿中途收過卡片沒
       const step = (now) => {
         if (myAnim !== tour.animId) return; // 已被更新的導覽請求取代
         const k = Math.min(1, (now - t0) / durMs);
         const pos = total ? pointAtPath(pathPts, cum, total, k) : pathPts[0];
         scooterMarker.setLatLng(pos);
-        if (tourPopup && map.hasLayer(tourPopup)) tourPopup.setLatLng(pos);
-        if (!cardRetracted && k >= 0.5) { cardRetracted = true; if (tourPopup && map.hasLayer(tourPopup)) tourCardRetract(); }
         if (trailLive && now - lastDraw > 90) {
           lastDraw = now;
           trailLive.clearLayers();
