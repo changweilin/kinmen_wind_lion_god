@@ -69,21 +69,37 @@
     /* 照片資訊卡：綁在機車游標上，顯示於游標正上方；抵達時地圖將其置中 */
     .tour-popup .leaflet-popup-content-wrapper { border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 6px 24px rgba(0,0,0,0.3); }
     .tour-popup .leaflet-popup-content { margin: 10px 12px; width: 300px !important; line-height: 1.4; }
-    .tp-head { display: flex; align-items: center; gap: 6px; background: linear-gradient(135deg, #1e3a8a, #2563eb); color: white; border-radius: 8px; padding: 6px 8px; margin-bottom: 6px; }
-    .tp-num { background: #f59e0b; color: #0f172a; font-weight: 800; font-size: 0.78rem; border-radius: 6px; padding: 2px 7px; white-space: nowrap; }
-    .tp-title { flex: 1; font-weight: 700; font-size: 0.86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* 漂亮卡牌風格：站點色漸層頭＋直式照片區（主上副下）＋輕快彈跳進出場 */
+    .tp-card { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); border-radius: 10px; }
+    .tp-head { display: flex; align-items: center; gap: 6px; background: linear-gradient(135deg, var(--tp-accent, #2563eb), #1e3a8a 130%); color: white; border-radius: 10px; padding: 7px 9px; margin-bottom: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.18); }
+    .tp-num { background: rgba(255,255,255,0.92); color: #0f172a; font-weight: 800; font-size: 0.78rem; border-radius: 6px; padding: 2px 7px; white-space: nowrap; }
+    .tp-title { flex: 1; font-weight: 700; font-size: 0.86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
     .tp-x { background: rgba(255,255,255,0.2); border: none; color: white; border-radius: 6px; width: 24px; height: 24px; cursor: pointer; font-size: 0.75rem; flex-shrink: 0; }
     .tp-x:hover { background: rgba(255,255,255,0.35); }
     .tp-meta { font-size: 0.73rem; color: #475569; }
-    .tp-collage { display: flex; gap: 6px; margin-top: 6px; }
-    .tp-main { width: 168px; height: 150px; object-fit: cover; border-radius: 8px; border: 2px solid #2563eb; cursor: pointer; display: block; flex-shrink: 0; }
-    .tp-main:hover { opacity: 0.88; }
-    .tp-subs { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; align-content: start; max-height: 150px; overflow-y: auto; }
-    .tp-subs img { width: 100%; height: 46px; object-fit: cover; border-radius: 5px; border: 1px solid #cbd5e1; cursor: pointer; display: block; }
-    .tp-subs img:hover { opacity: 0.85; border-color: #2563eb; }
-    .tp-single { flex: 1; display: flex; align-items: center; justify-content: center; background: #f1f5f9; border-radius: 6px; font-size: 0.7rem; color: #64748b; text-align: center; padding: 6px; }
+    .tp-photos { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+    .tp-main-v { width: 100%; height: 150px; object-fit: cover; border-radius: 10px; border: 2px solid var(--tp-accent, #2563eb); cursor: pointer; display: block; box-shadow: 0 2px 10px rgba(0,0,0,0.15); }
+    .tp-main-v:hover { opacity: 0.9; }
+    .tp-main-v.tall { height: 228px; } /* 無副照片時整個照片區都給主照片 */
+    .tp-subs-v { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; max-height: 112px; overflow-y: auto; }
+    .tp-subs-v img { width: 100%; height: 48px; object-fit: cover; border-radius: 6px; border: 2px solid #e2e8f0; cursor: pointer; display: block; background: white; }
+    .tp-subs-v img:hover { opacity: 0.85; border-color: var(--tp-accent, #2563eb); transform: translateY(-1px); }
     .tp-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; font-size: 0.7rem; color: #64748b; }
     .tp-foot a { color: #2563eb; text-decoration: none; font-weight: 600; }
+    /* 輕快動感：抵達彈跳入場、中途同風格收起（變形原點在卡片底部尖端） */
+    .tp-hidden { visibility: hidden; }
+    .tp-anim-in { animation: tp-pop-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); transform-origin: 50% 100%; }
+    .tp-anim-out { animation: tp-pop-out 0.3s ease-in forwards; transform-origin: 50% 100%; }
+    @keyframes tp-pop-in {
+      0% { transform: scale(0.3) translateY(26px); opacity: 0; }
+      55% { transform: scale(1.07) translateY(-5px); opacity: 1; }
+      75% { transform: scale(0.96) translateY(1px); }
+      100% { transform: scale(1) translateY(0); opacity: 1; }
+    }
+    @keyframes tp-pop-out {
+      0% { transform: scale(1) translateY(0); opacity: 1; }
+      100% { transform: scale(0.25) translateY(30px); opacity: 0; }
+    }
     #playerBar {
       position: absolute; left: 12px; bottom: 12px; z-index: 600;
       width: min(600px, calc(100% - 24px));
@@ -173,9 +189,10 @@
     /* 導覽播放器 RWD：手機上縮小游標上的照片卡、播放器貼齊地圖底部 */
     @media (max-width: 768px) {
       .tour-popup .leaflet-popup-content { width: min(250px, 68vw) !important; }
-      .tp-main { width: 138px; height: 118px; }
-      .tp-subs { max-height: 118px; }
-      .tp-subs img { height: 36px; }
+      .tp-main-v { height: 128px; }
+      .tp-main-v.tall { height: 190px; }
+      .tp-subs-v { max-height: 96px; }
+      .tp-subs-v img { height: 34px; }
       #playerBar { left: 8px; bottom: 8px; width: calc(100% - 16px); padding: 6px 8px; }
       #tourLabel { min-width: 64px; }
       .pbtn { min-width: 32px; height: 32px; }
@@ -1320,30 +1337,50 @@
       if (on) { trailStatic.addTo(map); trailLive.addTo(map); }
       else { map.removeLayer(trailStatic); map.removeLayer(trailLive); }
     }
-    // 照片資訊卡（拼貼）：一張主圖＋其餘副圖；塞進機車游標正上方的 popup，點副圖換主圖
+    // 照片資訊卡牌：主照片在上、副照片在下；無副照片時整個照片區都給主照片
     function tourPopupHtml(stop) {
       if (tour.mainPhotoIdx >= stop.photos.length) tour.mainPhotoIdx = 0;
       const main = stop.photos[tour.mainPhotoIdx];
       const color = getRainbowColor(stop.stop_id);
       const mainSrc = main.localUrl || main.thumbnailUrl;
-      let subs;
-      if (stop.photos.length <= 1) {
-        subs = '<div class="tp-single">本尊獨照・僅 1 張<br>📷 點主圖開原圖</div>';
-      } else {
-        subs = '<div class="tp-subs">' + stop.photos.map((p, i) => i === tour.mainPhotoIdx ? '' :
-          `<img src="${p.localUrl || p.thumbnailUrl}" onerror="this.src='${svgFallback}'" title="副圖 ${i + 1}・${p.time}（點我換成主圖）" onclick="swapTourMainPopup(${i})">`).join('') + '</div>';
-      }
-      return `<div class="tp-head"><span class="tp-num" style="background:${color};">${stop.stop_number}</span>`
+      const hasSubs = stop.photos.length > 1;
+      const subs = hasSubs ? '<div class="tp-subs-v">' + stop.photos.map((p, i) => i === tour.mainPhotoIdx ? '' :
+        `<img src="${p.localUrl || p.thumbnailUrl}" onerror="this.src='${svgFallback}'" title="副圖 ${i + 1}・${p.time}（點我換成主圖）" onclick="swapTourMainPopup(${i})">`).join('') + '</div>' : '';
+      return `<div class="tp-card" style="--tp-accent:${color};">`
+        + `<div class="tp-head"><span class="tp-num">${stop.stop_number}</span>`
         + `<span class="tp-title">${stop.name}</span><button class="tp-x" onclick="stopTour()" title="關閉導覽">✕</button></div>`
         + `<div class="tp-meta"><i class="fa-regular fa-clock"></i> ${stop.date} ${stop.time_display}<br><i class="fa-solid fa-location-dot"></i> ${stop.location}</div>`
-        + `<div class="tp-collage"><img class="tp-main" src="${mainSrc}" onerror="this.src='${svgFallback}'" alt="${stop.name} 主圖" onclick="openTourMain()" title="點我開原圖">${subs}</div>`
-        + `<div class="tp-foot"><span>📷 ${stop.photo_count} 張・主圖 ${tour.mainPhotoIdx + 1}/${stop.photos.length}</span><a href="${main.viewUrl}" target="_blank"><i class="fa-brands fa-google-drive"></i> 原圖</a></div>`;
+        + `<div class="tp-photos"><img class="tp-main-v${hasSubs ? '' : ' tall'}" src="${mainSrc}" onerror="this.src='${svgFallback}'" alt="${stop.name} 主圖" onclick="openTourMain()" title="點我開原圖">${subs}</div>`
+        + `<div class="tp-foot"><span>📷 ${stop.photo_count} 張・主圖 ${tour.mainPhotoIdx + 1}/${stop.photos.length}</span><a href="${main.viewUrl}" target="_blank"><i class="fa-brands fa-google-drive"></i> 原圖</a></div>`
+        + `</div>`;
+    }
+    function tpWrapper() { return document.querySelector('.tour-popup .leaflet-popup-content-wrapper'); }
+    // 抵達：輕快彈跳跳出卡片（重觸發 keyframe 動畫）
+    function tourCardPopIn() {
+      const w = tpWrapper();
+      if (!w) return;
+      w.classList.remove('tp-hidden', 'tp-anim-out', 'tp-anim-in');
+      void w.offsetWidth;
+      w.classList.add('tp-anim-in');
+    }
+    // 往下一站中途：同風格收起卡片（動畫完隱藏，抵達再換內容彈出）
+    function tourCardRetract(cb) {
+      const w = tpWrapper();
+      if (!w) { if (cb) cb(); return; }
+      w.classList.remove('tp-anim-in');
+      w.classList.add('tp-anim-out');
+      setTimeout(() => {
+        w.classList.remove('tp-anim-out');
+        w.classList.add('tp-hidden');
+        if (cb) cb();
+      }, 300);
     }
     function openTourPopup(stop) {
       if (!scooterMarker || !tourPopup) return;
       tourPopup.setContent(tourPopupHtml(stop));
       tourPopup.setLatLng(scooterMarker.getLatLng());
-      scooterMarker.openPopup();
+      if (!map.hasLayer(tourPopup)) scooterMarker.openPopup();
+      tourCardPopIn();
     }
     function swapTourMainPopup(i) {
       const stop = tourStops()[tour.idx];
@@ -1383,7 +1420,8 @@
       document.getElementById('tourStopName').textContent = `🛵 ${stop.stop_number} ${stop.name}`;
       tourSliderSync();
       highlightCard(stop.stop_id);
-      openTourPopup(stop); // 照片資訊掛在機車游標上方，行進間跟著走
+      if (opts.instant) openTourPopup(stop); // 手動跳站：直接換卡彈出
+      // 自動行進：出發時保留上一站卡片，中途收起、抵達才彈出下一張
       if (stop.lat && stop.lng) {
         const from = scooterMarker.getLatLng();
         const to = L.latLng(stop.lat, stop.lng);
@@ -1421,12 +1459,14 @@
       const cum = pathLengths(pathPts), total = cum[cum.length - 1] || 0;
       const t0 = performance.now();
       let lastDraw = 0;
+      let cardRetracted = false; // 本腿中途收過卡片沒
       const step = (now) => {
         if (myAnim !== tour.animId) return; // 已被更新的導覽請求取代
         const k = Math.min(1, (now - t0) / durMs);
         const pos = total ? pointAtPath(pathPts, cum, total, k) : pathPts[0];
         scooterMarker.setLatLng(pos);
         if (tourPopup && map.hasLayer(tourPopup)) tourPopup.setLatLng(pos);
+        if (!cardRetracted && k >= 0.5) { cardRetracted = true; if (tourPopup && map.hasLayer(tourPopup)) tourCardRetract(); }
         if (trailLive && now - lastDraw > 90) {
           lastDraw = now;
           trailLive.clearLayers();
@@ -1438,6 +1478,7 @@
         tour.arrived = true;
         if (trailLive) trailLive.clearLayers();
         drawTrailStatic(tour.idx, true); // 抵達：當前腿完整入列，t-3 以前的不留
+        openTourPopup(stopB); // 抵達：換下一張卡片並彈跳跳出
         if (isFollowOn()) centerTourPopup(); // 抵達：移動地圖讓照片資訊置中
       };
       tour.raf = requestAnimationFrame(step);
@@ -1462,7 +1503,7 @@
     function togglePlay() { tour.playing ? pauseTour() : startTour(); }
     function stopTour() {
       pauseTour();
-      if (map && tourPopup) map.closePopup(tourPopup);
+      if (map && tourPopup && map.hasLayer(tourPopup)) tourCardRetract(() => { if (map) map.closePopup(tourPopup); });
     }
     function stepTour(d) {
       const wasPlaying = tour.playing;
