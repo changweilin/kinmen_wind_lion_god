@@ -76,6 +76,8 @@
       <button class="btn btn-primary" onclick="document.getElementById('folderInput').click()">
         <i class="fa-solid fa-folder-open"></i> 匯入照片自動定位 GPS
       </button>
+      <button class="btn" onclick="autoNamePlaceholders()" title="依五輪規則為佔位站命名，保證不重複"><i class="fa-solid fa-wand-magic-sparkles"></i> 五輪自動命名</button>
+      <button class="btn" onclick="renameAllStops()" title="依新五輪規則重算全部30站（R2視覺確認保留）"><i class="fa-solid fa-rotate"></i> 全部重算</button>
       <button class="btn" onclick="exportGeoJSON()"><i class="fa-solid fa-download"></i> 匯出 GeoJSON</button>
     </div>
   </header>
@@ -108,45 +110,45 @@
     // 30 個風獅爺整合站點資料
     const stopsData = [
       {
-        stop_id: 1, stop_number: "#01", name: "下埔下風獅爺", date: "2026-09-10", time_display: "18:06:51",
-        lat: 24.4436804, lng: 118.3087024, location: "金寧鄉下埔下 / 慈湖路一段", photo_count: 1,
+        stop_id: 1, stop_number: "#01", name: "將軍廟風獅爺", date: "2026-09-10", time_display: "18:06:51",
+        lat: 24.4436804, lng: 118.3087024, location: "金寧鄉湖埔村下埔下 / 慈湖路一段(將軍廟畔)", photo_count: 1, naming_round: 3, naming_source: "其他地標・將軍廟(380m)", place: "下埔下",
         photos: [{ id: "1RHvt8kPY2FtRDeQSP1zVTljR0KaowXW6", title: "20260910_180651.jpg", time: "18:06:51", viewUrl: "https://drive.google.com/file/d/1RHvt8kPY2FtRDeQSP1zVTljR0KaowXW6/view?usp=drivesdk" }]
       },
       {
-        stop_id: 2, stop_number: "#02", name: "第 02 站風獅爺", date: "2026-09-11", time_display: "09:55:59 ~ 09:56:21",
-        lat: 24.4653628, lng: 118.3271766, location: "金寧鄉 (座標: 24.46536, 118.32718)", photo_count: 2,
+        stop_id: 2, stop_number: "#02", name: "西堡風獅爺", date: "2026-09-11", time_display: "09:55:59 ~ 09:56:21",
+        lat: 24.4653628, lng: 118.3271766, location: "金寧鄉安美村西堡", photo_count: 2, naming_round: 4, naming_source: "地名・西堡", place: "西堡",
         photos: [
           { id: "1dWroticymlvqAzHPt69hFIKVgYmhhiAB", title: "20260911_095559.jpg", time: "09:55:59", viewUrl: "https://drive.google.com/file/d/1dWroticymlvqAzHPt69hFIKVgYmhhiAB/view?usp=drivesdk" },
           { id: "1D-UKo00XAQvFG4es_PUvqUgJcGbNlcuZ", title: "20260911_095621.jpg", time: "09:56:21", viewUrl: "https://drive.google.com/file/d/1D-UKo00XAQvFG4es_PUvqUgJcGbNlcuZ/view?usp=drivesdk" }
         ]
       },
       {
-        stop_id: 3, stop_number: "#03", name: "第 03 站風獅爺", date: "2026-09-11", time_display: "10:14:11 ~ 10:14:20",
-        lat: 24.4744064, lng: 118.4060423, location: "金沙鎮 (座標: 24.47441, 118.40604)", photo_count: 2,
+        stop_id: 3, stop_number: "#03", name: "斗門風獅爺", date: "2026-09-11", time_display: "10:14:11 ~ 10:14:20",
+        lat: 24.4744064, lng: 118.4060423, location: "金沙鎮何斗里斗門", photo_count: 2, naming_round: 4, naming_source: "地名・斗門", place: "斗門",
         photos: [
           { id: "1DFekR4HFtCFbumWPsxEHvSpQdup7uqkS", title: "20260911_101411.jpg", time: "10:14:11", viewUrl: "https://drive.google.com/file/d/1DFekR4HFtCFbumWPsxEHvSpQdup7uqkS/view?usp=drivesdk" },
           { id: "1Iv6dUlATv4fl5pBZGe7M2bPx3PdyD-vi", title: "20260911_101420.jpg", time: "10:14:20", viewUrl: "https://drive.google.com/file/d/1Iv6dUlATv4fl5pBZGe7M2bPx3PdyD-vi/view?usp=drivesdk" }
         ]
       },
       {
-        stop_id: 4, stop_number: "#04", name: "第 04 站風獅爺", date: "2026-09-11", time_display: "14:11:13 ~ 14:11:15",
-        lat: 24.5213735, lng: 118.4135824, location: "金沙鎮 (座標: 24.52137, 118.41358)", photo_count: 2,
+        stop_id: 4, stop_number: "#04", name: "龍鳳宮風獅爺", date: "2026-09-11", time_display: "14:11:13 ~ 14:11:15",
+        lat: 24.5213735, lng: 118.4135824, location: "金沙鎮官嶼里官澳 / 光華路二段(龍鳳宮畔)", photo_count: 2, naming_round: 3, naming_source: "其他地標・龍鳳宮(313m)", place: "官澳",
         photos: [
           { id: "1L5suGbNaYMKIfL7U7tSMXBcpfCIk5ffD", title: "20260911_141113.jpg", time: "14:11:13", viewUrl: "https://drive.google.com/file/d/1L5suGbNaYMKIfL7U7tSMXBcpfCIk5ffD/view?usp=drivesdk" },
           { id: "1DDW4okdayo11I1edB7SWp60uUV4Tz7IR", title: "20260911_141115.jpg", time: "14:11:15", viewUrl: "https://drive.google.com/file/d/1DDW4okdayo11I1edB7SWp60uUV4Tz7IR/view?usp=drivesdk" }
         ]
       },
       {
-        stop_id: 5, stop_number: "#05", name: "第 05 站風獅爺", date: "2026-09-11", time_display: "14:22:02 ~ 14:24:25",
-        lat: 24.5214233, lng: 118.4124399, location: "金沙鎮 (座標: 24.52142, 118.41244)", photo_count: 2,
+        stop_id: 5, stop_number: "#05", name: "馬山三角堡風獅爺", date: "2026-09-11", time_display: "14:22:02 ~ 14:24:25",
+        lat: 24.5214233, lng: 118.4124399, location: "金沙鎮官嶼里官澳(馬山三角堡畔)", photo_count: 2, naming_round: 3, naming_source: "其他地標・馬山三角堡(297m)", place: "官澳",
         photos: [
           { id: "11_3YJIULvkMKySznIQfsZYJx0Z9j9snM", title: "20260911_142202.jpg", time: "14:22:02", viewUrl: "https://drive.google.com/file/d/11_3YJIULvkMKySznIQfsZYJx0Z9j9snM/view?usp=drivesdk" },
           { id: "1im0zVF4IdSgf32afp5RPJ867QwhoDR-u", title: "20260911_142425.jpg", time: "14:24:25", viewUrl: "https://drive.google.com/file/d/1im0zVF4IdSgf32afp5RPJ867QwhoDR-u/view?usp=drivesdk" }
         ]
       },
       {
-        stop_id: 6, stop_number: "#06", name: "第 06 站風獅爺", date: "2026-09-11", time_display: "15:58:11 ~ 15:59:41",
-        lat: 24.4364126, lng: 118.454158, location: "金湖鎮 (座標: 24.43641, 118.45416)", photo_count: 3,
+        stop_id: 6, stop_number: "#06", name: "下湖風獅爺", date: "2026-09-11", time_display: "15:58:11 ~ 15:59:41",
+        lat: 24.4364126, lng: 118.454158, location: "金湖鎮溪湖里下湖 / 四維路", photo_count: 3, naming_round: 4, naming_source: "地名・下湖", place: "下湖",
         photos: [
           { id: "1Ifcefv_jTvrK0YoBzszX29JpuvP2GbEQ", title: "20260911_155811.mp4", time: "15:58:11", viewUrl: "https://drive.google.com/file/d/1Ifcefv_jTvrK0YoBzszX29JpuvP2GbEQ/view?usp=drivesdk" },
           { id: "1OEQ8XyMo-3jZOW3WAUlI3eBSq3xjhRYH", title: "20260911_155833.jpg", time: "15:58:33", viewUrl: "https://drive.google.com/file/d/1OEQ8XyMo-3jZOW3WAUlI3eBSq3xjhRYH/view?usp=drivesdk" },
@@ -154,16 +156,16 @@
         ]
       },
       {
-        stop_id: 7, stop_number: "#07", name: "第 07 站風獅爺", date: "2026-09-11", time_display: "16:06:30 ~ 16:06:43",
-        lat: 24.4270509, lng: 118.4467606, location: "金湖鎮 (座標: 24.42705, 118.44676)", photo_count: 2,
+        stop_id: 7, stop_number: "#07", name: "西村風獅爺", date: "2026-09-11", time_display: "16:06:30 ~ 16:06:43",
+        lat: 24.4270509, lng: 118.4467606, location: "金湖鎮蓮庵里西村 / 西峰路", photo_count: 2, naming_round: 4, naming_source: "地名・西村", place: "西村",
         photos: [
           { id: "1ejTox_e111YWntopIVWz3cwopzJs_uAi", title: "20260911_160630.jpg", time: "16:06:30", viewUrl: "https://drive.google.com/file/d/1ejTox_e111YWntopIVWz3cwopzJs_uAi/view?usp=drivesdk" },
           { id: "11qgorhTWNKMAvByJ0kwctLYEmcYuWbGA", title: "20260911_160643.jpg", time: "16:06:43", viewUrl: "https://drive.google.com/file/d/11qgorhTWNKMAvByJ0kwctLYEmcYuWbGA/view?usp=drivesdk" }
         ]
       },
       {
-        stop_id: 8, stop_number: "#08", name: "第 08 站風獅爺", date: "2026-09-11", time_display: "16:54:52 ~ 16:54:59",
-        lat: 24.4372894, lng: 118.389552, location: "金湖鎮 (座標: 24.43729, 118.38955)", photo_count: 2,
+        stop_id: 8, stop_number: "#08", name: "陳景蘭洋樓風獅爺", date: "2026-09-11", time_display: "16:54:52 ~ 16:54:59",
+        lat: 24.4372894, lng: 118.389552, location: "金湖鎮正義里成功(陳景蘭洋樓畔)", photo_count: 2, naming_round: 3, naming_source: "其他地標・陳景蘭洋樓(58m)", place: "成功",
         photos: [
           { id: "14l6s5XubKKln-uNs1cdNa8L1EKVlmkS8", title: "20260911_165452.jpg", time: "16:54:52", viewUrl: "https://drive.google.com/file/d/14l6s5XubKKln-uNs1cdNa8L1EKVlmkS8/view?usp=drivesdk" },
           { id: "1U0isWn98yXVmJfh_PrmLxJLkgvxgfIja", title: "20260911_165459.jpg", time: "16:54:59", viewUrl: "https://drive.google.com/file/d/1U0isWn98yXVmJfh_PrmLxJLkgvxgfIja/view?usp=drivesdk" }
@@ -171,12 +173,12 @@
       },
       {
         stop_id: 9, stop_number: "#09", name: "夏興風獅爺", date: "2026-09-11", time_display: "17:28:11",
-        lat: 24.439757, lng: 118.3944648, location: "金湖鎮 (座標: 24.43976, 118.39446)", photo_count: 1,
+        lat: 24.439757, lng: 118.3944648, location: "金湖鎮正義里夏興", photo_count: 1, naming_round: 1, naming_source: "風獅爺地標・夏興(POI)", place: "夏興",
         photos: [{ id: "1_GvsOFwCumAH6vVBzTLXE0BsgcVTF3QX", title: "20260911_172811.jpg", time: "17:28:11", viewUrl: "https://drive.google.com/file/d/1_GvsOFwCumAH6vVBzTLXE0BsgcVTF3QX/view?usp=drivesdk" }]
       },
       {
-        stop_id: 10, stop_number: "#10", name: "第 10 站風獅爺", date: "2026-09-11", time_display: "17:31:34 ~ 17:31:45",
-        lat: 24.4424905, lng: 118.389481, location: "金湖鎮 (座標: 24.44249, 118.38948)", photo_count: 2,
+        stop_id: 10, stop_number: "#10", name: "柳林路口風獅爺", date: "2026-09-11", time_display: "17:31:34 ~ 17:31:45",
+        lat: 24.4424905, lng: 118.389481, location: "金湖鎮正義里成功(柳林路口旁)", photo_count: 2, naming_round: 4, naming_source: "站牌名・柳林路口(270m)", place: "成功",
         photos: [
           { id: "1O6wVvXFb88bmTU5nttK-4Q33oefvj9h3", title: "20260911_173134.jpg", time: "17:31:34", viewUrl: "https://drive.google.com/file/d/1O6wVvXFb88bmTU5nttK-4Q33oefvj9h3/view?usp=drivesdk" },
           { id: "1rdDRX0ht0jM8nAjzZst_YVXZGt8f9aRW", title: "20260911_173145.jpg", time: "17:31:45", viewUrl: "https://drive.google.com/file/d/1rdDRX0ht0jM8nAjzZst_YVXZGt8f9aRW/view?usp=drivesdk" }
@@ -184,7 +186,7 @@
       },
       {
         stop_id: 11, stop_number: "#11", name: "中蘭風獅爺", date: "2026-09-11", time_display: "17:41:08 ~ 17:41:13",
-        lat: 24.4634501, lng: 118.3858824, location: "金沙鎮 (座標: 24.46345, 118.38588)", photo_count: 2,
+        lat: 24.4634501, lng: 118.3858824, location: "金沙鎮中蘭", photo_count: 2, naming_round: 1, naming_source: "風獅爺地標・中蘭(POI)", place: "中蘭",
         photos: [
           { id: "1SQRjGhXjMVYJ1UINydflX6addYSRzesR", title: "20260911_174108.jpg", time: "17:41:08", viewUrl: "https://drive.google.com/file/d/1SQRjGhXjMVYJ1UINydflX6addYSRzesR/view?usp=drivesdk" },
           { id: "1H8-sjAgR-ZqX5v6OXhFQNBBDfLaDcWAv", title: "20260911_174113.jpg", time: "17:41:13", viewUrl: "https://drive.google.com/file/d/1H8-sjAgR-ZqX5v6OXhFQNBBDfLaDcWAv/view?usp=drivesdk" }
@@ -192,28 +194,28 @@
       },
       {
         stop_id: 12, stop_number: "#12", name: "瓊林風獅爺", date: "2026-09-11", time_display: "17:50:10 ~ 17:50:18",
-        lat: 24.4568638, lng: 118.3740299, location: "金湖鎮 (座標: 24.45686, 118.37403)", photo_count: 2,
+        lat: 24.4568638, lng: 118.3740299, location: "金湖鎮瓊林里瓊林", photo_count: 2, naming_round: 1, naming_source: "風獅爺地標・瓊林(POI 8m/站牌34m)", place: "珩厝",
         photos: [
           { id: "1mupd1EdbDI7t3MvZtB4YghNcFq8CLf3q", title: "20260911_175010.jpg", time: "17:50:10", viewUrl: "https://drive.google.com/file/d/1mupd1EdbDI7t3MvZtB4YghNcFq8CLf3q/view?usp=drivesdk" },
           { id: "1_KiSd7iO67Bx2Q5SA_3TEyA6h2Yq4V4l", title: "20260911_175018.jpg", time: "17:50:18", viewUrl: "https://drive.google.com/file/d/1_KiSd7iO67Bx2Q5SA_3TEyA6h2Yq4V4l/view?usp=drivesdk" }
         ]
       },
       {
-        stop_id: 13, stop_number: "#13", name: "第 13 站風獅爺", date: "2026-09-11", time_display: "18:00:38 ~ 18:00:41",
-        lat: 24.4534091, lng: 118.3730234, location: "金湖鎮 (座標: 24.45341, 118.37302)", photo_count: 2,
+        stop_id: 13, stop_number: "#13", name: "瓊林風獅爺之二", date: "2026-09-11", time_display: "18:00:38 ~ 18:00:41",
+        lat: 24.4534091, lng: 118.3730234, location: "金湖鎮瓊林里瓊林", photo_count: 2, naming_round: 1, naming_source: "風獅爺地標・瓊林去重之二", place: "瓊林",
         photos: [
           { id: "16tzRaipv96dAMSphiEofCrEiKy6AacCr", title: "20260911_180038.jpg", time: "18:00:38", viewUrl: "https://drive.google.com/file/d/16tzRaipv96dAMSphiEofCrEiKy6AacCr/view?usp=drivesdk" },
           { id: "10KuM3pCnaRxWjQGk7ZKHVcxtjew8B6hb", title: "20260911_180041.jpg", time: "18:00:41", viewUrl: "https://drive.google.com/file/d/10KuM3pCnaRxWjQGk7ZKHVcxtjew8B6hb/view?usp=drivesdk" }
         ]
       },
       {
-        stop_id: 14, stop_number: "#14", name: "第 14 站風獅爺", date: "2026-09-11", time_display: "18:05:39",
-        lat: 24.4527547, lng: 118.3726023, location: "金湖鎮 (座標: 24.45275, 118.37260)", photo_count: 1,
+        stop_id: 14, stop_number: "#14", name: "瓊林風獅爺之三", date: "2026-09-11", time_display: "18:05:39",
+        lat: 24.4527547, lng: 118.3726023, location: "金湖鎮瓊林里瓊林", photo_count: 1, naming_round: 1, naming_source: "風獅爺地標・瓊林去重之三", place: "瓊林",
         photos: [{ id: "1IpWmfFpZ2o8fUsUciQvtOH9g2vUoB_AW", title: "20260911_180539.jpg", time: "18:05:39", viewUrl: "https://drive.google.com/file/d/1IpWmfFpZ2o8fUsUciQvtOH9g2vUoB_AW/view?usp=drivesdk" }]
       },
       {
-        stop_id: 15, stop_number: "#15", name: "第 15 站風獅爺", date: "2026-09-11", time_display: "18:15:04 ~ 18:18:04",
-        lat: 24.4542708, lng: 118.3737362, location: "金湖鎮 (座標: 24.45427, 118.37374)", photo_count: 3,
+        stop_id: 15, stop_number: "#15", name: "瓊林風獅爺之四", date: "2026-09-11", time_display: "18:15:04 ~ 18:18:04",
+        lat: 24.4542708, lng: 118.3737362, location: "金湖鎮瓊林里瓊林", photo_count: 3, naming_round: 1, naming_source: "風獅爺地標・瓊林去重之四", place: "瓊林",
         photos: [
           { id: "1Y9rXvXEba6dK4Fs8Xqp9bctQrnh5YFVV", title: "20260911_181504.jpg", time: "18:15:04", viewUrl: "https://drive.google.com/file/d/1Y9rXvXEba6dK4Fs8Xqp9bctQrnh5YFVV/view?usp=drivesdk" },
           { id: "1wNs05aCocYTq9ZJx0RJk605D2k1sQ6hy", title: "20260911_181533.jpg", time: "18:15:33", viewUrl: "https://drive.google.com/file/d/1wNs05aCocYTq9ZJx0RJk605D2k1sQ6hy/view?usp=drivesdk" },
@@ -221,13 +223,13 @@
         ]
       },
       {
-        stop_id: 16, stop_number: "#16", name: "第 16 站風獅爺", date: "2026-09-11", time_display: "18:27:23",
-        lat: 24.4416354, lng: 118.3425208, location: "金寧鄉 (座標: 24.44164, 118.34252)", photo_count: 1,
+        stop_id: 16, stop_number: "#16", name: "前厝風獅爺", date: "2026-09-11", time_display: "18:27:23",
+        lat: 24.4416354, lng: 118.3425208, location: "金寧鄉盤山村下堡(前厝站畔) / 伯玉路二段", photo_count: 1, naming_round: 4, naming_source: "站牌名・前厝三(25m)", place: "下堡",
         photos: [{ id: "1kKhh9i5Y9NR52XydWoCv1ptuk7NVmNr-", title: "20260911_182723.jpg", time: "18:27:23", viewUrl: "https://drive.google.com/file/d/1kKhh9i5Y9NR52XydWoCv1ptuk7NVmNr-/view?usp=drivesdk" }]
       },
       {
-        stop_id: 17, stop_number: "#17", name: "第 17 站風獅爺", date: "2026-09-12", time_display: "10:05:24 ~ 10:05:50",
-        lat: 24.4255968, lng: 118.3101236, location: "金城鎮 (座標: 24.42560, 118.31012)", photo_count: 2,
+        stop_id: 17, stop_number: "#17", name: "夏墅風獅爺", date: "2026-09-12", time_display: "10:05:24 ~ 10:05:50",
+        lat: 24.4255968, lng: 118.3101236, location: "金城鎮賢庵里賢厝(夏墅站畔) / 延平路", photo_count: 2, naming_round: 4, naming_source: "站牌名・夏墅(109m)", place: "賢厝",
         photos: [
           { id: "1xR1geWCzB_JNto4DQHOeSK6w9yrUQAIo", title: "20260912_100524.jpg", time: "10:05:24", viewUrl: "https://drive.google.com/file/d/1xR1geWCzB_JNto4DQHOeSK6w9yrUQAIo/view?usp=drivesdk" },
           { id: "1Un9wKcHT5k2avlVOOSGLdFEFvempu-wx", title: "20260912_100550.jpg", time: "10:05:50", viewUrl: "https://drive.google.com/file/d/1Un9wKcHT5k2avlVOOSGLdFEFvempu-wx/view?usp=drivesdk" }
@@ -235,12 +237,12 @@
       },
       {
         stop_id: 18, stop_number: "#18", name: "風獅爺文物坊", date: "2026-09-12", time_display: "11:06:26",
-        lat: 24.4094756, lng: 118.298667, location: "金城鎮 (座標: 24.40948, 118.29867)", photo_count: 1,
+        lat: 24.4094756, lng: 118.298667, location: "金城鎮金水里前水頭 / 風獅爺文物坊", photo_count: 1, naming_round: 1, naming_source: "風獅爺地標・文物坊(POI)", place: "前水頭",
         photos: [{ id: "1Ok_P2Tn2BrAa-JycVjlia6qplI8e5cyY", title: "20260912_110626.jpg", time: "11:06:26", viewUrl: "https://drive.google.com/file/d/1Ok_P2Tn2BrAa-JycVjlia6qplI8e5cyY/view?usp=drivesdk" }]
       },
       {
         stop_id: 19, stop_number: "#19", name: "迥向殿風獅爺", date: "2026-09-12", time_display: "11:46:20 ~ 11:47:42",
-        lat: 24.4042653, lng: 118.3096337, location: "金城鎮 (座標: 24.40427, 118.30963)", photo_count: 5,
+        lat: 24.4042653, lng: 118.3096337, location: "金城鎮古城里迥向殿", photo_count: 5, naming_round: 1, naming_source: "風獅爺地標・迥向殿(POI)", place: "東社",
         photos: [
           { id: "1Lek5RMIrBkUt7cC1xhOUlD_ad1vdiHLU", title: "20260912_114620.jpg", time: "11:46:20", viewUrl: "https://drive.google.com/file/d/1Lek5RMIrBkUt7cC1xhOUlD_ad1vdiHLU/view?usp=drivesdk" },
           { id: "1PF3SqVm77seO06Ju3je1vfmBuBJ5iX16", title: "20260912_114628.jpg", time: "11:46:28", viewUrl: "https://drive.google.com/file/d/1PF3SqVm77seO06Ju3je1vfmBuBJ5iX16/view?usp=drivesdk" },
@@ -250,26 +252,26 @@
         ]
       },
       {
-        stop_id: 20, stop_number: "#20", name: "第 20 站風獅爺", date: "2026-09-12", time_display: "13:26:59 ~ 13:27:07",
-        lat: 24.3996715, lng: 118.3173685, location: "金城鎮 (座標: 24.39967, 118.31737)", photo_count: 2,
+        stop_id: 20, stop_number: "#20", name: "古崗風獅爺", date: "2026-09-12", time_display: "13:26:59 ~ 13:27:07",
+        lat: 24.3996715, lng: 118.3173685, location: "金城鎮古城里古崗 / 珠水路", photo_count: 2, naming_round: 4, naming_source: "地名・古崗", place: "古崗",
         photos: [
           { id: "1uV6JYosgOHY9vBXNjPHacCiu78vY8NvB", title: "20260912_132659.jpg", time: "13:26:59", viewUrl: "https://drive.google.com/file/d/1uV6JYosgOHY9vBXNjPHacCiu78vY8NvB/view?usp=drivesdk" },
           { id: "1YFVVa7txVGRemnEVTrQX7QOcNHqdRfPk", title: "20260912_132707.jpg", time: "13:27:07", viewUrl: "https://drive.google.com/file/d/1YFVVa7txVGRemnEVTrQX7QOcNHqdRfPk/view?usp=drivesdk" }
         ]
       },
       {
-        stop_id: 21, stop_number: "#21", name: "第 21 站風獅爺", date: "2026-09-12", time_display: "15:21:27",
-        lat: 24.4125826, lng: 118.3191786, location: "金城鎮 (座標: 24.41258, 118.31918)", photo_count: 1,
+        stop_id: 21, stop_number: "#21", name: "和平新村風獅爺", date: "2026-09-12", time_display: "15:21:27",
+        lat: 24.4125826, lng: 118.3191786, location: "金城鎮賢庵里和平新村 / 環島南路一段", photo_count: 1, naming_round: 4, naming_source: "地名・和平新村", place: "和平新村",
         photos: [{ id: "1zif8Nzz2S7cqVDdpSkkhXQxILssswMAI", title: "20260912_152127.jpg", time: "15:21:27", viewUrl: "https://drive.google.com/file/d/1zif8Nzz2S7cqVDdpSkkhXQxILssswMAI/view?usp=drivesdk" }]
       },
       {
-        stop_id: 22, stop_number: "#22", name: "第 22 站風獅爺", date: "2026-09-12", time_display: "15:40:11",
-        lat: 24.4118108, lng: 118.3358585, location: "金城鎮 (座標: 24.41181, 118.33586)", photo_count: 1,
+        stop_id: 22, stop_number: "#22", name: "泗湖風獅爺", date: "2026-09-12", time_display: "15:40:11",
+        lat: 24.4118108, lng: 118.3358585, location: "金城鎮珠沙里泗湖", photo_count: 1, naming_round: 4, naming_source: "地名・泗湖", place: "泗湖",
         photos: [{ id: "1TpgZq-CHd93H9Drr8e_QcUkXYvvqFtgp", title: "20260912_154011.jpg", time: "15:40:11", viewUrl: "https://drive.google.com/file/d/1TpgZq-CHd93H9Drr8e_QcUkXYvvqFtgp/view?usp=drivesdk" }]
       },
       {
-        stop_id: 23, stop_number: "#23", name: "第 23 站風獅爺", date: "2026-09-12", time_display: "15:46:07 ~ 15:46:36",
-        lat: 24.4128779, lng: 118.336449, location: "金城鎮 (座標: 24.41288, 118.33645)", photo_count: 4,
+        stop_id: 23, stop_number: "#23", name: "泗湖東風獅爺", date: "2026-09-12", time_display: "15:46:07 ~ 15:46:36",
+        lat: 24.4128779, lng: 118.336449, location: "金城鎮珠沙里泗湖(東側)", photo_count: 4, naming_round: 4, naming_source: "地名・泗湖+方位去重", place: "泗湖",
         photos: [
           { id: "1aNZwh4wzENYj-KbJwueblJQtinbcPVg5", title: "20260912_154607.jpg", time: "15:46:07", viewUrl: "https://drive.google.com/file/d/1aNZwh4wzENYj-KbJwueblJQtinbcPVg5/view?usp=drivesdk" },
           { id: "1elgQFS3ATa2Il-Gp7p4ItgIEnUdydS2X", title: "20260912_154612.jpg", time: "15:46:12", viewUrl: "https://drive.google.com/file/d/1elgQFS3ATa2Il-Gp7p4ItgIEnUdydS2X/view?usp=drivesdk" },
@@ -278,8 +280,8 @@
         ]
       },
       {
-        stop_id: 24, stop_number: "#24", name: "第 24 站風獅爺", date: "2026-09-12", time_display: "15:55:29 ~ 16:00:51",
-        lat: 24.4313823, lng: 118.3315275, location: "金寧鄉 (座標: 24.43138, 118.33153)", photo_count: 5,
+        stop_id: 24, stop_number: "#24", name: "孚佑廟風獅爺", date: "2026-09-12", time_display: "15:55:29 ~ 16:00:51",
+        lat: 24.4313823, lng: 118.3315275, location: "金寧鄉榜林村東洲 / 桃園路(孚佑廟)", photo_count: 5, naming_round: 3, naming_source: "其他地標・孚佑廟(11m)", place: "東洲",
         photos: [
           { id: "14A8-IO8B7sQZVk7wdsBtjrYFGuuQy0AC", title: "20260912_155529.jpg", time: "15:55:29", viewUrl: "https://drive.google.com/file/d/14A8-IO8B7sQZVk7wdsBtjrYFGuuQy0AC/view?usp=drivesdk" },
           { id: "10b3IiKXXZ3yRdT2bA3b4N9463LLH1mrE", title: "20260912_155609.jpg", time: "15:56:09", viewUrl: "https://drive.google.com/file/d/10b3IiKXXZ3yRdT2bA3b4N9463LLH1mrE/view?usp=drivesdk" },
@@ -289,28 +291,28 @@
         ]
       },
       {
-        stop_id: 25, stop_number: "#25", name: "第 25 站風獅爺", date: "2026-09-12", time_display: "16:16:27",
-        lat: 24.477527, lng: 118.3112914, location: "金寧鄉 (座標: 24.47753, 118.31129)", photo_count: 1,
+        stop_id: 25, stop_number: "#25", name: "雙鯉湖風獅爺", date: "2026-09-12", time_display: "16:16:27",
+        lat: 24.477527, lng: 118.3112914, location: "金寧鄉古寧村北山(雙鯉湖畔)", photo_count: 1, naming_round: 3, naming_source: "其他地標・雙鯉湖(129m)", place: "北山",
         photos: [{ id: "1LnkZlDE82EET-fk2Pfap8opXJj6tSRK5", title: "20260912_161627.jpg", time: "16:16:27", viewUrl: "https://drive.google.com/file/d/1LnkZlDE82EET-fk2Pfap8opXJj6tSRK5/view?usp=drivesdk" }]
       },
       {
         stop_id: 26, stop_number: "#26", name: "湖下風獅爺", date: "2026-09-12", time_display: "16:52:50",
-        lat: 24.4577716, lng: 118.3085661, location: "金寧鄉 (座標: 24.45777, 118.30857)", photo_count: 1,
+        lat: 24.4577716, lng: 118.3085661, location: "金寧鄉湖埔村湖下", photo_count: 1, naming_round: 1, naming_source: "風獅爺地標・湖下(POI)", place: "湖下",
         photos: [{ id: "1jR1uzaqo48OVV07ZBsK3GS9AJv4OKVJV", title: "20260912_165250.jpg", time: "16:52:50", viewUrl: "https://drive.google.com/file/d/1jR1uzaqo48OVV07ZBsK3GS9AJv4OKVJV/view?usp=drivesdk" }]
       },
       {
         stop_id: 27, stop_number: "#27", name: "百年風獅爺", date: "2026-09-12", time_display: "17:16:14",
-        lat: 24.4355484, lng: 118.237894, location: "烈嶼鄉 (座標: 24.43555, 118.23789)", photo_count: 1,
+        lat: 24.4355484, lng: 118.237894, location: "烈嶼鄉上林村(百年老店旁)", photo_count: 1, naming_round: 1, naming_source: "風獅爺地標・百年(POI)", place: "西方",
         photos: [{ id: "1Xozr3Cqx8ryrcwTjSeNeU5aR9mLi8WgQ", title: "20260912_171614.jpg", time: "17:16:14", viewUrl: "https://drive.google.com/file/d/1Xozr3Cqx8ryrcwTjSeNeU5aR9mLi8WgQ/view?usp=drivesdk" }]
       },
       {
-        stop_id: 28, stop_number: "#28", name: "第 28 站風獅爺", date: "2026-09-12", time_display: "17:30:18",
-        lat: 24.4297459, lng: 118.248342, location: "烈嶼鄉 (座標: 24.42975, 118.24834)", photo_count: 1,
+        stop_id: 28, stop_number: "#28", name: "東林風獅爺", date: "2026-09-12", time_display: "17:30:18",
+        lat: 24.4297459, lng: 118.248342, location: "烈嶼鄉林湖村東林", photo_count: 1, naming_round: 4, naming_source: "地名・東林", place: "東林",
         photos: [{ id: "1--ZtKiNx75ji3er7fk8nS7ggNNeJC-T2", title: "20260912_173018.jpg", time: "17:30:18", viewUrl: "https://drive.google.com/file/d/1--ZtKiNx75ji3er7fk8nS7ggNNeJC-T2/view?usp=drivesdk" }]
       },
       {
         stop_id: 29, stop_number: "#29", name: "后頭風獅爺", date: "2026-09-12", time_display: "17:38:15 ~ 17:41:16",
-        lat: 24.4405217, lng: 118.2599216, location: "烈嶼鄉 (座標: 24.44052, 118.25992)", photo_count: 3,
+        lat: 24.4405217, lng: 118.2599216, location: "烈嶼鄉黃埔村后頭", photo_count: 3, naming_round: 4, naming_source: "地名・后頭", place: "后頭",
         photos: [
           { id: "1GyFKA41wk5viO-MkbXTMLvqIvPHjYfF4", title: "20260912_173815.jpg", time: "17:38:15", viewUrl: "https://drive.google.com/file/d/1GyFKA41wk5viO-MkbXTMLvqIvPHjYfF4/view?usp=drivesdk" },
           { id: "1tDhnZXKIDHU92zhCmZyw2lQR411UruDE", title: "20260912_173821.jpg", time: "17:38:21", viewUrl: "https://drive.google.com/file/d/1tDhnZXKIDHU92zhCmZyw2lQR411UruDE/view?usp=drivesdk" },
@@ -318,8 +320,8 @@
         ]
       },
       {
-        stop_id: 30, stop_number: "#30", name: "第 30 站風獅爺", date: "2026-09-13", time_display: "08:12:56 ~ 08:13:31",
-        lat: 24.4361801, lng: 118.3683527, location: "金湖鎮 (座標: 24.43618, 118.36835)", photo_count: 2,
+        stop_id: 30, stop_number: "#30", name: "民航站風獅爺", date: "2026-09-13", time_display: "08:12:56 ~ 08:13:31",
+        lat: 24.4361801, lng: 118.3683527, location: "金湖鎮正義里尚義(民航站畔) / 中山路", photo_count: 2, naming_round: 4, naming_source: "站牌名・民航站(49m)", place: "尚義",
         photos: [
           { id: "12cYTOdJuM_jFSBXnhj_ReJ5V1wR7syB9", title: "20260913_081256.jpg", time: "08:12:56", viewUrl: "https://drive.google.com/file/d/12cYTOdJuM_jFSBXnhj_ReJ5V1wR7syB9/view?usp=drivesdk" },
           { id: "1dp20T4YVJCqNlpuG5uvP0ykH_xYXFkIY", title: "20260913_081331.jpg", time: "08:13:31", viewUrl: "https://drive.google.com/file/d/1dp20T4YVJCqNlpuG5uvP0ykH_xYXFkIY/view?usp=drivesdk" }
@@ -333,6 +335,310 @@
         p.thumbnailUrl = `https://drive.google.com/thumbnail?id=${p.id}&sz=w800`;
       });
     });
+
+    // ===== 五輪命名規則引擎 =====
+    // R1 名稱有風獅爺的地標(500m) > R2 視覺確認有風獅爺的名稱或地名(人工看照片)
+    // > R3 其他地標(400m：廟宇/洋樓/湖等) > R4 附近站牌名(300m)或地名 > R5 視覺其他特徵(人工)。
+    // 全站名稱強制唯一。Drive 縮圖需登入，R2/R5 由使用者在彈窗看照片後輸入，存 localStorage。
+    const NAMING_CONFIG = { round1RadiusM: 500, round3RadiusM: 400, round4StopRadiusM: 300, overpassTimeoutSec: 25 };
+    const ROUND_LABEL = { 1: '第一輪・風獅爺地標', 2: '第二輪・視覺確認', 3: '第三輪・其他地標', 4: '第四輪・站牌地名', 5: '第五輪・視覺特徵' };
+    const VISUAL_STORE_KEY = 'wls_naming_visual_v1';
+    // R1：已驗證的風獅爺地標（Nominatim/OSM 可查，名稱含風獅爺）
+    const WIND_LION_SPOTS = [
+      { key: '夏興', name: '夏興風獅爺', lat: 24.439757, lng: 118.3944648 },
+      { key: '中蘭', name: '中蘭風獅爺', lat: 24.4634501, lng: 118.3858824 },
+      { key: '瓊林', name: '瓊林風獅爺', lat: 24.4567999, lng: 118.3739847 },
+      { key: '文物坊', name: '風獅爺文物坊', lat: 24.4094756, lng: 118.298667 },
+      { key: '迥向殿', name: '迥向殿風獅爺', lat: 24.4042653, lng: 118.3096337 },
+      { key: '湖下', name: '湖下風獅爺', lat: 24.4577716, lng: 118.3085661 },
+      { key: '百年', name: '百年風獅爺', lat: 24.4355484, lng: 118.237894 },
+    ];
+    // R3：已驗證的其他地標（Nominatim 可查：廟宇/洋樓/湖/坑道/古蹟）
+    const OTHER_LANDMARKS = [
+      { key: '將軍廟', lat: 24.4417046, lng: 118.3118239 },
+      { key: '龍鳳宮', lat: 24.5188615, lng: 118.4121734 },
+      { key: '馬山三角堡', lat: 24.5228510, lng: 118.4099470 },
+      { key: '陳景蘭洋樓', lat: 24.4373253, lng: 118.3901251 },
+      { key: '孚佑廟', lat: 24.4313033, lng: 118.3315908 },
+      { key: '雙鯉湖', lat: 24.4763649, lng: 118.3113221 },
+      { key: '魯王疑塚', lat: 24.4009141, lng: 118.3107983 },
+      { key: '延平郡王祠', lat: 24.4244223, lng: 118.3048223 },
+      { key: '瓊林坑道', lat: 24.4549313, lng: 118.37277 },
+      { key: '葉華成故居', lat: 24.3991047, lng: 118.305704 },
+    ];
+    // R4：已驗證的附近公車站牌（OSM highway=bus_stop，272 站中與本島 30 站 600m 內相關者）
+    const NEARBY_BUS_STOPS = [
+      { key: "修車廠", lat: 24.447884, lng: 118.31035 },
+      { key: "前厝三", lat: 24.441748, lng: 118.3423 },
+      { key: "前厝二", lat: 24.440702, lng: 118.339039 },
+      { key: "古寧頭村民活動中心", lat: 24.477624, lng: 118.312347 },
+      { key: "夏墅", lat: 24.424951, lng: 118.309301 },
+      { key: "夏興", lat: 24.439273, lng: 118.394319 },
+      { key: "將軍廟", lat: 24.441698, lng: 118.311641 },
+      { key: "屠宰場", lat: 24.460262, lng: 118.382599 },
+      { key: "庵邊(四維路)", lat: 24.424781, lng: 118.443001 },
+      { key: "廟口", lat: 24.412068, lng: 118.294024 },
+      { key: "延平郡王祠", lat: 24.42488, lng: 118.30429 },
+      { key: "成功", lat: 24.440627, lng: 118.391455 },
+      { key: "成功一", lat: 24.438644, lng: 118.389741 },
+      { key: "成功二", lat: 24.437581, lng: 118.388975 },
+      { key: "新厝甲", lat: 24.517382, lng: 118.41141 },
+      { key: "柳林路口", lat: 24.44422, lng: 118.387604 },
+      { key: "榜林一", lat: 24.433981, lng: 118.330633 },
+      { key: "榜林東洲路口", lat: 24.432704, lng: 118.329894 },
+      { key: "歐厝一", lat: 24.409113, lng: 118.331069 },
+      { key: "民航站", lat: 24.436416, lng: 118.36877 },
+      { key: "湖下一", lat: 24.454474, lng: 118.305914 },
+      { key: "湖下三", lat: 24.456687, lng: 118.304234 },
+      { key: "湖下二", lat: 24.455271, lng: 118.304783 },
+      { key: "烈嶼分院", lat: 24.432089, lng: 118.243685 },
+      { key: "烈嶼國中", lat: 24.428349, lng: 118.243433 },
+      { key: "烈嶼橋頭(后頭)", lat: 24.442797, lng: 118.256766 },
+      { key: "烈嶼橋頭(黃厝)", lat: 24.44396, lng: 118.25561 },
+      { key: "珠山", lat: 24.402815, lng: 118.319075 },
+      { key: "環保局", lat: 24.440902, lng: 118.368817 },
+      { key: "瓊徑路口", lat: 24.45653, lng: 118.376908 },
+      { key: "瓊林", lat: 24.453259, lng: 118.373993 },
+      { key: "瓊林一", lat: 24.452134, lng: 118.374511 },
+      { key: "瓊林坑道", lat: 24.454975, lng: 118.373033 },
+      { key: "瓊林聚落", lat: 24.453542, lng: 118.373912 },
+      { key: "瓊林風獅爺", lat: 24.456795, lng: 118.373587 },
+      { key: "盤山", lat: 24.44243, lng: 118.344927 },
+      { key: "綜合運動場", lat: 24.430222, lng: 118.25136 },
+      { key: "舊東門", lat: 24.400098, lng: 118.309042 },
+      { key: "賢庵國小", lat: 24.417668, lng: 118.31854 },
+      { key: "金陵山莊", lat: 24.434771, lng: 118.239624 },
+      { key: "陳景蘭洋樓", lat: 24.436685, lng: 118.388458 },
+      { key: "雙鯉湖", lat: 24.476309, lng: 118.311423 },
+      { key: "雙鯉湖濕地", lat: 24.476635, lng: 118.309975 },
+      { key: "頂蘭", lat: 24.46, lng: 118.3853 },
+      { key: "馬山三角堡", lat: 24.522851, lng: 118.409947 },
+      { key: "高坑二", lat: 24.4664, lng: 118.3883 },
+      { key: "魯王疑塚", lat: 24.400914, lng: 118.310798 },
+      { key: "龍鳳宮", lat: 24.518915, lng: 118.412041 },
+    ];
+
+    function haversineM(lat1, lng1, lat2, lng2) {
+      const R = 6371000, toRad = d => d * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1), dLng = toRad(lng2 - lng1);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(a));
+    }
+    function isPlaceholderName(name) { return /^第\s*\d+\s*站/.test(name || ''); }
+    function cleanBase(s) {
+      return (s || '').replace(/(鄉|鎮|市|縣|村|里|路|街|段|巷|弄|號).*$/, m => m.length <= 2 ? m : m).trim()
+        .replace(/^[^\u4e00-\u9fa5a-zA-Z0-9]+|[^\u4e00-\u9fa5a-zA-Z0-9]+$/g, '');
+    }
+    // 全站唯一性保證：重複時依序加 方位 → 之二/之三…；回傳唯一名稱
+    // numericOnly=true 時跳過方位、直接用之二/之三（同一地標群去重用）
+    function ensureUniqueName(base, usedSet, lat, lng, siblings, numericOnly) {
+      const root = base.includes('風獅爺') ? base : base + '風獅爺';
+      if (!usedSet.has(root)) { usedSet.add(root); return root; }
+      if (!numericOnly) {
+        const stem = root.replace(/風獅爺.*$/, '');
+        const dirs = ['東', '西', '南', '北', '中'];
+        for (const d of dirs) {
+          const cand = stem + d + '風獅爺';
+          if (!usedSet.has(cand)) { usedSet.add(cand); return cand; }
+        }
+      }
+      let i = 2;
+      while (usedSet.has(`${root}之${['', '', '二', '三', '四', '五', '六', '七', '八', '九'][i] || i}`)) i++;
+      const num = ['二', '三', '四', '五', '六', '七', '八', '九'][i - 2] || i;
+      const cand = `${root}之${num}`;
+      usedSet.add(cand);
+      return cand;
+    }
+    // 站牌名清理：「前厝三」→「前厝」、「成功二」→「成功」，括號附註保留
+    function cleanStationKey(s) {
+      return (s || '').replace(/[一二三四五六七八九\d]+$/, '').trim() || s;
+    }
+    function getUsedNames(excludeStopId) {
+      const s = new Set();
+      stopsData.forEach(st => { if (st.stop_id !== excludeStopId && st.name && !isPlaceholderName(st.name)) s.add(st.name); });
+      return s;
+    }
+    function matchNearest(list, lat, lng, radiusM) {
+      let best = null, bestD = Infinity;
+      for (const e of list) {
+        const d = haversineM(lat, lng, e.lat, e.lng);
+        if (d <= radiusM && d < bestD) { bestD = d; best = e; }
+      }
+      return best ? { entry: best, key: best.key, distM: Math.round(bestD) } : null;
+    }
+    // 同一輪內已有站用過最近地標時，改取次近未用過者（避免硬加後綴）
+    function matchNearestUnused(list, lat, lng, radiusM, usedSet, baseOf) {
+      const cands = [];
+      for (const e of list) {
+        const d = haversineM(lat, lng, e.lat, e.lng);
+        if (d <= radiusM) {
+          const base = baseOf(e);
+          const root = base.includes('風獅爺') ? base : base + '風獅爺';
+          if (!usedSet.has(root)) cands.push({ entry: e, key: e.key, distM: Math.round(d) });
+        }
+      }
+      cands.sort((a, b) => a.distM - b.distM);
+      return cands[0] || null;
+    }
+    async function queryOverpassWindLion(lat, lng, radiusM) {
+      const q = `[out:json][timeout:${NAMING_CONFIG.overpassTimeoutSec}];(node["name"~"風獅|石獅爺|風獅爺",i](around:${radiusM},${lat},${lng});way["name"~"風獅|石獅爺|風獅爺",i](around:${radiusM},${lat},${lng});relation["name"~"風獅|石獅爺|風獅爺",i](around:${radiusM},${lat},${lng}););out center 20;`;
+      const res = await fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'data=' + encodeURIComponent(q)
+      });
+      if (!res.ok) throw new Error('Overpass ' + res.status);
+      const j = await res.json();
+      const hits = (j.elements || []).map(e => e.tags && e.tags.name).filter(Boolean);
+      return [...new Set(hits)];
+    }
+    async function reverseGeocode(lat, lng) {
+      const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=zh-TW&zoom=18`;
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      if (!res.ok) throw new Error('Nominatim ' + res.status);
+      const j = await res.json();
+      return j.address || {};
+    }
+    function pickPlaceName(addr) {
+      for (const k of ['hamlet', 'village', 'suburb', 'neighbourhood', 'quarter', 'city_district', 'town'])
+        if (addr[k]) return addr[k];
+      return '';
+    }
+    // 五輪命名主函式：回傳 { name, round, source }，保證與 usedSet 不重複
+    // R1 風獅爺地標 > R2 視覺確認(人工) > R3 其他地標 > R4 站牌/地名 > R5 視覺特徵(人工)
+    async function resolveName5Rounds(stop, usedSet) {
+      // R1: 名稱有風獅爺的地標（內嵌已驗證表 + Overpass 即時查詢補強；同群去重用之二/三）
+      const wl = matchNearest(WIND_LION_SPOTS, stop.lat, stop.lng, NAMING_CONFIG.round1RadiusM);
+      if (wl) return { name: ensureUniqueName(wl.entry.name, usedSet, null, null, null, true), round: 1, source: `風獅爺地標・${wl.entry.key}(${wl.distM}m)` };
+      try {
+        const hits = await queryOverpassWindLion(stop.lat, stop.lng, NAMING_CONFIG.round1RadiusM);
+        if (hits.length) {
+          const short = cleanBase(hits[0].replace(/風獅爺.*$/, '').replace(/.*[鎮鄉](.+)/, '$1')) || hits[0];
+          return { name: ensureUniqueName(short.replace(/風獅爺.*$/, '') || hits[0], usedSet), round: 1, source: `OSM地標・${hits[0]}` };
+        }
+      } catch (e) { console.warn('R1 overpass略過', e); }
+      // R2: 視覺確認有風獅爺的名稱或地名（使用者看照片後輸入，存 stop.visual_confirmed）
+      if (stop.visual_confirmed) {
+        return { name: ensureUniqueName(stop.visual_confirmed, usedSet), round: 2, source: `視覺確認・${stop.visual_confirmed}` };
+      }
+      // R3: 其他地標（廟宇/洋樓/湖等已驗證表；最近者已用則取次近未用者）
+      const lmU = matchNearestUnused(OTHER_LANDMARKS, stop.lat, stop.lng, NAMING_CONFIG.round3RadiusM, usedSet, e => e.key);
+      if (lmU) return { name: ensureUniqueName(lmU.key, usedSet), round: 3, source: `其他地標・${lmU.key}(${lmU.distM}m)` };
+      const lm = matchNearest(OTHER_LANDMARKS, stop.lat, stop.lng, NAMING_CONFIG.round3RadiusM);
+      if (lm) return { name: ensureUniqueName(lm.key, usedSet), round: 3, source: `其他地標・${lm.key}(${lm.distM}m去重)` };
+      // R4: 附近站牌名（300m內；已用則取次近未用者）或地名（內嵌 place，缺時才即時逆地理編碼）
+      const bsU = matchNearestUnused(NEARBY_BUS_STOPS, stop.lat, stop.lng, NAMING_CONFIG.round4StopRadiusM, usedSet, e => cleanStationKey(e.key));
+      if (bsU) {
+        const base = cleanStationKey(bsU.key);
+        return { name: ensureUniqueName(base, usedSet), round: 4, source: `站牌名・${bsU.key}(${bsU.distM}m)` };
+      }
+      let place = stop.place || '';
+      if (!place) {
+        try {
+          const addr = await reverseGeocode(stop.lat, stop.lng);
+          place = cleanBase(pickPlaceName(addr));
+        } catch (e) { console.warn('逆地理編碼失敗', e); }
+      }
+      if (place) return { name: ensureUniqueName(place, usedSet), round: 4, source: `地名・${place}` };
+      // R5: 視覺其他特徵（需人工看照片確認）
+      const visual = prompt(`【${stop.stop_number}】前四輪皆無可用名稱。\n請目視該站照片，輸入適合的特徵命名（例：石雕坐姿／紅披風／廟口）：`, stop.visual_feature || '石雕立姿');
+      if (visual === null) throw new Error('使用者取消 R5 命名');
+      stop.visual_feature = cleanBase(visual) || '待辨識';
+      saveVisualOverrides();
+      return { name: ensureUniqueName(stop.visual_feature, usedSet), round: 5, source: '視覺特徵・人工目視' };
+    }
+    // R2/R5 視覺確認 UI：使用者看彈窗照片後輸入，結果存 localStorage
+    function visualConfirm(stopId, kind) {
+      const stop = stopsData.find(s => s.stop_id === stopId);
+      if (!stop) return;
+      if (kind === 'name') {
+        const v = prompt(`【${stop.stop_number} ${stop.name}】\n請目視上方照片：風獅爺本體或說明牌上有無名稱或地名？\n有則輸入（將列為第二輪命名），無則按取消：`, stop.visual_confirmed || '');
+        if (v === null || !v.trim()) return;
+        stop.visual_confirmed = cleanBase(v.trim());
+        saveVisualOverrides();
+        const used = getUsedNames(stopId);
+        stop.name = ensureUniqueName(stop.visual_confirmed, used);
+        stop.naming_round = 2;
+        stop.naming_source = `視覺確認・${stop.visual_confirmed}`;
+      } else {
+        const v = prompt(`【${stop.stop_number} ${stop.name}】\n請目視上方照片，輸入其他適合的視覺特徵（例：紅披風石獅／坐姿陶獅）：`, stop.visual_feature || '');
+        if (v === null || !v.trim()) return;
+        stop.visual_feature = cleanBase(v.trim());
+        saveVisualOverrides();
+        const used = getUsedNames(stopId);
+        stop.name = ensureUniqueName(stop.visual_feature, used);
+        stop.naming_round = 5;
+        stop.naming_source = '視覺特徵・人工目視';
+      }
+      renderMarkers(); renderList();
+      alert(`已更新為【${stop.name}】（${ROUND_LABEL[stop.naming_round]}），全站唯一性：${checkNamesUnique().ok ? '通過' : '有重複！'}`);
+    }
+    function saveVisualOverrides() {
+      try {
+        const o = {};
+        stopsData.forEach(s => {
+          if (s.visual_confirmed || s.visual_feature) o[s.stop_id] = { vc: s.visual_confirmed || '', vf: s.visual_feature || '' };
+        });
+        localStorage.setItem(VISUAL_STORE_KEY, JSON.stringify(o));
+      } catch (e) { console.warn('localStorage 寫入失敗', e); }
+    }
+    function loadVisualOverrides() {
+      try {
+        const o = JSON.parse(localStorage.getItem(VISUAL_STORE_KEY) || '{}');
+        let applied = 0;
+        const used = getUsedNames(null);
+        // 先移除已套用的 R2/R5 舊名再重算，避免殘留
+        stopsData.forEach(s => {
+          const rec = o[s.stop_id];
+          if (!rec) return;
+          s.visual_confirmed = rec.vc || undefined;
+          s.visual_feature = rec.vf || undefined;
+          if (rec.vc) {
+            used.delete(s.name);
+            s.name = ensureUniqueName(rec.vc, used);
+            s.naming_round = 2;
+            s.naming_source = `視覺確認・${rec.vc}`;
+            applied++;
+          }
+        });
+        if (applied) console.log(`已還原 ${applied} 站視覺確認命名`);
+      } catch (e) { console.warn('localStorage 讀取失敗', e); }
+    }
+    async function autoNamePlaceholders() {
+      const targets = stopsData.filter(s => isPlaceholderName(s.name) && s.lat && s.lng);
+      if (!targets.length) { alert('目前沒有「第 XX 站」佔位名稱，30 站皆已命名且無重複。'); return; }
+      if (!confirm(`將依五輪規則為 ${targets.length} 站自動命名（風獅爺地標→視覺確認→其他地標→站牌地名→視覺特徵），並保證不重複。繼續？`)) return;
+      const used = getUsedNames(null);
+      let n = 0;
+      for (const st of targets) {
+        try {
+          const r = await resolveName5Rounds(st, used);
+          st.name = r.name; st.naming_round = r.round; st.naming_source = r.source; n++;
+          await new Promise(res => setTimeout(res, 1100)); // 遵守 Nominatim 1req/s
+        } catch (e) { console.error(st.stop_number, e); }
+      }
+      renderMarkers(); renderList();
+      alert(`已完成 ${n} 站自動命名，全站名稱唯一性檢查：${checkNamesUnique().ok ? '通過' : '有重複！'}`);
+    }
+    // 全部重新命名：依五輪規則重算 30 站（含已命名站；R2 視覺確認保留）
+    async function renameAllStops() {
+      if (!confirm('將依新五輪規則（風獅爺地標→視覺確認→其他地標→站牌地名→視覺特徵）為全部 30 站重新命名，R2 視覺確認會保留。繼續？')) return;
+      const used = new Set();
+      let n = 0;
+      for (const st of [...stopsData].sort((a, b) => a.stop_id - b.stop_id)) {
+        try {
+          const r = await resolveName5Rounds(st, used);
+          st.name = r.name; st.naming_round = r.round; st.naming_source = r.source; n++;
+          await new Promise(res => setTimeout(res, 1100));
+        } catch (e) { console.error(st.stop_number, e); used.add(st.name); }
+      }
+      renderMarkers(); renderList();
+      alert(`已重算 ${n} 站，全站唯一性：${checkNamesUnique().ok ? '通過' : '有重複！'}`);
+    }
+    function checkNamesUnique() {
+      const seen = new Map(), dup = [];
+      stopsData.forEach(s => { if (seen.has(s.name)) dup.push(s.name); else seen.set(s.name, s.stop_id); });
+      return { ok: dup.length === 0, dups: dup };
+    }
 
     let currentFilter = 'ALL';
     let markers = {};
@@ -376,6 +682,7 @@
 
       L.control.layers(baseMaps, null, { position: 'topright', collapsed: false }).addTo(map);
 
+      loadVisualOverrides();
       renderMarkers();
       renderList();
       updateCounts();
@@ -427,9 +734,18 @@
               <div class="popup-meta">
                 <div><i class="fa-regular fa-clock"></i> <strong>拍攝時間：</strong>${stop.date} ${stop.time_display}</div>
                 <div><i class="fa-solid fa-location-dot"></i> <strong>地點：</strong>${stop.location}</div>
+                ${stop.naming_round ? `<div><i class="fa-solid fa-tag"></i> <strong>命名：</strong>${ROUND_LABEL[stop.naming_round] || ('第' + stop.naming_round + '輪')}${stop.naming_source ? '・' + stop.naming_source : ''}</div>` : ''}
               </div>
               <img id="main-img-${stop.stop_id}" class="popup-main-img" src="${imgUrl}" onerror="this.src='${svgFallback}'" alt="${stop.name}">
               ${galleryHtml}
+              <div class="popup-actions" style="margin-bottom:5px;">
+                <button class="popup-link" style="border:none;cursor:pointer;background:#7c3aed;" onclick="visualConfirm(${stop.stop_id},'name')" title="看照片：風獅爺本體或說明牌上的名稱/地名 → 第二輪">
+                  <i class="fa-solid fa-eye"></i> 視覺確認名稱(R2)
+                </button>
+                <button class="popup-link" style="border:none;cursor:pointer;background:#64748b;" onclick="visualConfirm(${stop.stop_id},'feature')" title="看照片：其他視覺特徵 → 第五輪">
+                  <i class="fa-solid fa-palette"></i> 特徵命名(R5)
+                </button>
+              </div>
               <div class="popup-actions">
                 <a href="https://www.google.com/maps/search/?api=1&query=${stop.lat},${stop.lng}" target="_blank" class="popup-link" style="background:#ea4335;" title="在 Google Maps 查看此座標地標">
                   <i class="fa-solid fa-map-location-dot"></i> Google Maps
@@ -573,6 +889,11 @@
             date: s.date,
             time_display: s.time_display,
             location: s.location,
+            naming_round: s.naming_round,
+            naming_source: s.naming_source,
+            place: s.place,
+            visual_confirmed: s.visual_confirmed,
+            visual_feature: s.visual_feature,
             photo_count: s.photo_count,
             photos: s.photos.map(p => ({ title: p.title, time: p.time, viewUrl: p.viewUrl }))
           }
