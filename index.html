@@ -200,13 +200,6 @@
       .popup-actions .popup-link { min-height: 36px; font-size: 0.72rem; }
       .leaflet-control-layers { font-size: 0.75rem !important; max-width: 60vw; }
     }
-    /* 臨時編輯模式：可拖曳旗標外框提示＋彈窗編輯表單 */
-    #editToggleBtn.on { background: #f59e0b; border-color: #d97706; color: #0f172a; }
-    .custom-pin.editable { outline: 2px dashed #f59e0b; outline-offset: 2px; border-radius: 8px; cursor: grab; }
-    .edit-form input { width: 100%; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 6px; font-size: 0.75rem; margin-top: 3px; }
-    .edit-form .latlng-row { display: flex; gap: 5px; }
-    .edit-form .latlng-row input { flex: 1; min-width: 0; font-family: monospace; }
-    .edited-tag { background: #fef3c7; color: #b45309; font-size: 0.68rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; }
     /* 超小手機 (<=380px) */
     @media (max-width: 380px) {
       header h1 { font-size: 0.82rem; }
@@ -239,7 +232,6 @@
       <button class="btn icon-only" onclick="autoNamePlaceholders()" title="五輪自動命名：依五輪規則為佔位站命名，保證不重複"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
       <button class="btn icon-only" onclick="renameAllStops()" title="全部重算：依新五輪規則重算全部37站（R2視覺確認保留）"><i class="fa-solid fa-rotate"></i></button>
       <button class="btn icon-only" onclick="exportGeoJSON()" title="匯出 GeoJSON"><i class="fa-solid fa-download"></i></button>
-      <button class="btn icon-only" id="editToggleBtn" onclick="toggleEditMode()" title="臨時編輯：拖曳旗標改位置、彈窗改名，草稿存本機，匯出 edits.json 後下次 commit 定稿"><i class="fa-solid fa-pen"></i><span id="editCountBadge" style="display:none;background:#ef4444;border-radius:8px;font-size:0.65rem;padding:0 5px;margin-left:2px;">0</span></button>
     </div>
   </header>
 
@@ -276,21 +268,6 @@
           </div>
         </div>
         </div>
-      </div>
-      <!-- 臨時編輯面板：草稿清單＋匯出 edits.json（下次 commit 定稿） -->
-      <div id="editPanel" style="display:none;position:absolute;right:12px;top:60px;z-index:650;width:min(320px,calc(100% - 24px));background:rgba(15,23,42,0.95);color:white;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,0.35);padding:10px 12px;font-size:0.78rem;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-          <strong><i class="fa-solid fa-pen"></i> 臨時編輯 <span id="editPanelCount" style="color:#fde68a;"></span></strong>
-          <button onclick="toggleEditMode(false)" title="關閉編輯模式" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);color:white;border-radius:6px;width:26px;height:26px;cursor:pointer;">✕</button>
-        </div>
-        <div style="color:#cbd5e1;margin-bottom:6px;">拖曳旗標改位置・彈窗改名・草稿存本機瀏覽器</div>
-        <div id="editList" style="max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;margin-bottom:8px;"></div>
-        <div style="display:flex;gap:5px;flex-wrap:wrap;">
-          <button onclick="exportEditsFile()" title="下載合併後的 edits.json，覆蓋 repo 根目錄後 commit 即定稿" style="flex:1;background:#f59e0b;border:1px solid #d97706;color:#0f172a;border-radius:6px;padding:6px 4px;font-weight:700;cursor:pointer;font-size:0.75rem;white-space:nowrap;"><i class="fa-solid fa-download"></i> 匯出 edits.json</button>
-          <button onclick="copyEditsJSON()" title="複製編輯 JSON 到剪貼簿" style="background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.25);color:white;border-radius:6px;padding:6px 8px;cursor:pointer;font-size:0.75rem;">複製</button>
-          <button onclick="clearDraftEdits()" title="清除本機草稿（已 commit 的 edits.json 不受影響）" style="background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.25);color:white;border-radius:6px;padding:6px 8px;cursor:pointer;font-size:0.75rem;">清除</button>
-        </div>
-        <div style="color:#94a3b8;margin-top:6px;font-size:0.7rem;">定稿：匯出覆蓋 <code>edits.json</code> → 執行 <code>node scripts/apply-edits.mjs</code> → commit</div>
       </div>
       <button id="listFab" onclick="toggleDrawer()" title="風獅爺清單"><i class="fa-solid fa-list"></i></button>
     </div>
@@ -915,163 +892,6 @@
       return { ok: dup.length === 0, dups: dup };
     }
 
-    // ===== 臨時編輯（位置＋重新命名）：草稿存 localStorage，下次 commit 定稿 =====
-    // 流程：開編輯模式 → 拖曳旗標改座標 / 彈窗改名 → 草稿即時存 localStorage(wsg_edits_v1)
-    // →「匯出 edits.json」下載合併檔覆蓋 repo 根目錄 edits.json
-    // → commit 前執行 node scripts/apply-edits.mjs 烘焙進 stopsData（定稿），edits.json 自動清空。
-    const EDIT_STORE_KEY = 'wsg_edits_v1';
-    let editMode = false;
-    let committedEdits = {};
-    function loadDraftEdits() {
-      try { return JSON.parse(localStorage.getItem(EDIT_STORE_KEY) || '{}'); }
-      catch (e) { return {}; }
-    }
-    function saveDraftEdits(d) {
-      try { localStorage.setItem(EDIT_STORE_KEY, JSON.stringify(d)); }
-      catch (e) { console.warn('編輯草稿寫入失敗', e); }
-    }
-    function mergedEdits() { return Object.assign({}, committedEdits, loadDraftEdits()); }
-    function applyEditsToStops() {
-      const m = mergedEdits();
-      stopsData.forEach(s => {
-        if (!s._orig) s._orig = { name: s.name, lat: s.lat, lng: s.lng };
-        const e = m[s.stop_id] || m[String(s.stop_id)];
-        if (e) {
-          if (typeof e.name === 'string' && e.name.trim()) s.name = e.name.trim();
-          if (Number.isFinite(e.lat) && Number.isFinite(e.lng)) { s.lat = e.lat; s.lng = e.lng; }
-          s._edited = true;
-        } else {
-          s.name = s._orig.name; s.lat = s._orig.lat; s.lng = s._orig.lng;
-          s._edited = false;
-        }
-      });
-    }
-    async function loadCommittedEdits() {
-      try {
-        const r = await fetch('edits.json', { cache: 'no-store' });
-        if (r.ok) {
-          const j = await r.json();
-          if (j && typeof j === 'object') committedEdits = j;
-          applyEditsToStops();
-          if (typeof map !== 'undefined' && map) { renderMarkers(); renderList(); }
-          refreshEditUI();
-        }
-      } catch (e) { /* 無 edits.json 或 file:// 下讀不到：僅用本機草稿 */ }
-    }
-    function toggleEditMode(force) {
-      editMode = typeof force === 'boolean' ? force : !editMode;
-      const b = document.getElementById('editToggleBtn');
-      if (b) b.classList.toggle('on', editMode);
-      const p = document.getElementById('editPanel');
-      if (p) p.style.display = editMode ? 'block' : 'none';
-      pauseTour();
-      renderMarkers(); renderList(); refreshEditUI();
-    }
-    function upsertDraft(stopId, patch) {
-      const d = loadDraftEdits();
-      const key = String(stopId);
-      const prev = d[key] || {};
-      const next = Object.assign({}, prev, patch, { updatedAt: new Date().toISOString() });
-      if (Object.keys(patch).length === 0) delete d[key];
-      else d[key] = next;
-      saveDraftEdits(d);
-      applyEditsToStops();
-      renderMarkers(); renderList(); refreshEditUI();
-    }
-    function onMarkerDragEnd(stopId, latlng) {
-      const lat = Math.round(latlng.lat * 1e7) / 1e7;
-      const lng = Math.round(latlng.lng * 1e7) / 1e7;
-      upsertDraft(stopId, { lat, lng });
-    }
-    function saveStopEdit(stopId) {
-      const nameEl = document.getElementById(`edit-name-${stopId}`);
-      const latEl = document.getElementById(`edit-lat-${stopId}`);
-      const lngEl = document.getElementById(`edit-lng-${stopId}`);
-      const stop = stopsData.find(s => s.stop_id === stopId);
-      if (!stop) return;
-      const patch = {};
-      const name = (nameEl && nameEl.value || '').trim();
-      if (name && name !== (stop._orig && stop._orig.name)) patch.name = name;
-      else if (name === (stop._orig && stop._orig.name)) patch.name = undefined;
-      const lat = latEl ? parseFloat(latEl.value) : NaN;
-      const lng = lngEl ? parseFloat(lngEl.value) : NaN;
-      if (Number.isFinite(lat) && Number.isFinite(lng)) {
-        if (lat !== stop._orig.lat || lng !== stop._orig.lng) { patch.lat = lat; patch.lng = lng; }
-      } else if (latEl && lngEl) { alert('座標格式錯誤，請輸入數字。'); return; }
-      // 名稱唯一性提醒（不擋存，只警告）
-      if (patch.name) {
-        const dup = stopsData.some(s => s.stop_id !== stopId && s.name === patch.name);
-        if (dup && !confirm(`【${patch.name}】與其他站同名，確定仍要儲存？`)) return;
-      }
-      if (patch.name === undefined) delete patch.name;
-      const d = loadDraftEdits();
-      const key = String(stopId);
-      const merged = Object.assign({}, d[key], patch, { updatedAt: new Date().toISOString() });
-      if (merged.name === undefined) delete merged.name;
-      if (merged.name === (stop._orig && stop._orig.name)) delete merged.name;
-      if (!merged.name && !(Number.isFinite(merged.lat) && Number.isFinite(merged.lng))) delete d[key];
-      else d[key] = merged;
-      saveDraftEdits(d);
-      applyEditsToStops();
-      renderMarkers(); renderList(); refreshEditUI();
-      if (markers[stopId]) markers[stopId].openPopup();
-    }
-    function revertStopEdit(stopId) {
-      const d = loadDraftEdits();
-      delete d[String(stopId)];
-      // 若定稿檔已有該站，退回定稿值而非原值：刪草稿後以 committed 重算
-      saveDraftEdits(d);
-      applyEditsToStops();
-      renderMarkers(); renderList(); refreshEditUI();
-    }
-    function clearDraftEdits() {
-      const d = loadDraftEdits();
-      if (!Object.keys(d).length) { alert('目前沒有本機草稿。'); return; }
-      if (!confirm(`清除 ${Object.keys(d).length} 站本機草稿？（已 commit 的 edits.json 不受影響）`)) return;
-      saveDraftEdits({});
-      applyEditsToStops();
-      renderMarkers(); renderList(); refreshEditUI();
-    }
-    function exportEditsFile() {
-      const m = mergedEdits();
-      if (!Object.keys(m).length) { alert('目前沒有任何編輯可匯出。'); return; }
-      const blob = new Blob([JSON.stringify(m, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'edits.json';
-      a.click();
-      alert(`已匯出 ${Object.keys(m).length} 站編輯為 edits.json。\n定稿步驟：覆蓋 repo 根目錄 edits.json → node scripts/apply-edits.mjs → 檢查 diff → commit。`);
-    }
-    function copyEditsJSON() {
-      const m = mergedEdits();
-      const txt = JSON.stringify(m, null, 2);
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(txt).then(() => alert('已複製編輯 JSON。'), () => prompt('複製失敗，請手動複製：', txt));
-      } else prompt('請手動複製編輯 JSON：', txt);
-    }
-    function refreshEditUI() {
-      const m = mergedEdits();
-      const n = Object.keys(m).length;
-      const badge = document.getElementById('editCountBadge');
-      if (badge) { badge.style.display = n ? 'inline-block' : 'none'; badge.textContent = n; }
-      const cnt = document.getElementById('editPanelCount');
-      if (cnt) cnt.textContent = n ? `（${n} 站）` : '（無草稿）';
-      const list = document.getElementById('editList');
-      if (!list) return;
-      if (!n) { list.innerHTML = '<div style="color:#64748b;">尚無編輯。開編輯模式後拖曳旗標或在彈窗改名。</div>'; return; }
-      list.innerHTML = Object.keys(m).sort((a, b) => +a - +b).map(k => {
-        const stop = stopsData.find(s => String(s.stop_id) === String(k));
-        const e = m[k];
-        const o = stop && stop._orig ? stop._orig : {};
-        const parts = [];
-        if (e.name && e.name !== o.name) parts.push(`名：${o.name || '?'} → ${e.name}`);
-        if (Number.isFinite(e.lat) && (e.lat !== o.lat || e.lng !== o.lng)) parts.push(`位：${o.lat},${o.lng} → ${e.lat},${e.lng}`);
-        return `<div style="background:rgba(255,255,255,0.08);border-radius:6px;padding:5px 7px;display:flex;gap:6px;align-items:center;">`
-          + `<span style="flex:1;min-width:0;">#${k} ${parts.join('<br>') || '(無變更)'}</span>`
-          + `<button onclick="revertStopEdit(${k})" title="還原此站" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);color:white;border-radius:5px;cursor:pointer;font-size:0.7rem;padding:2px 7px;">還原</button></div>`;
-      }).join('');
-    }
-
     let currentFilter = 'ALL';
     let markers = {};
     let map;
@@ -1117,8 +937,6 @@
       initMobileUI();
 
       loadVisualOverrides();
-      applyEditsToStops();
-      loadCommittedEdits();
       renderMarkers();
       renderList();
       updateCounts();
@@ -1149,17 +967,7 @@
         if (stop.lat && stop.lng) {
           if (currentFilter !== 'ALL' && stop.date !== currentFilter) return;
 
-          const marker = L.marker([stop.lat, stop.lng], { icon: createNumberedIcon(stop.stop_id), draggable: editMode, autoPan: editMode }).addTo(map);
-          if (editMode) {
-            marker.on('dragend', () => onMarkerDragEnd(stop.stop_id, marker.getLatLng()));
-            marker.on('drag', (ev) => {
-              const ll = ev.latlng || marker.getLatLng();
-              const la = document.getElementById(`edit-lat-${stop.stop_id}`);
-              const ln = document.getElementById(`edit-lng-${stop.stop_id}`);
-              if (la) la.value = (Math.round(ll.lat * 1e7) / 1e7).toFixed(7);
-              if (ln) ln.value = (Math.round(ll.lng * 1e7) / 1e7).toFixed(7);
-            });
-          }
+          const marker = L.marker([stop.lat, stop.lng], { icon: createNumberedIcon(stop.stop_id) }).addTo(map);
           const firstPhoto = stop.photos[0];
           const imgUrl = firstPhoto.localUrl || firstPhoto.thumbnailUrl;
 
@@ -1171,7 +979,7 @@
             `).join('') + '</div>';
           }
 
-          let popupContent = `
+          const popupContent = `
             <div class="popup-box">
               <div class="popup-header">
                 <div class="popup-title" style="color: ${getRainbowColor(stop.stop_id)}; font-weight: 700;">${stop.stop_number} ${stop.name}</div>
@@ -1206,23 +1014,6 @@
             </div>
           `;
 
-          if (editMode) {
-            popupContent += `
-              <div class="edit-form" style="margin-top:6px;border-top:1px dashed #cbd5e1;padding-top:6px;">
-                <div>${stop._edited ? '<span class="edited-tag">已編輯・草稿</span>' : '<span style="font-size:0.7rem;color:#64748b;">拖曳旗標即改位置，下欄改名後按儲存</span>'}</div>
-                <input id="edit-name-${stop.stop_id}" value="${stop.name.replace(/"/g, '&quot;')}" maxlength="40" title="重新命名">
-                <div class="latlng-row">
-                  <input id="edit-lat-${stop.stop_id}" value="${stop.lat.toFixed(7)}" inputmode="decimal" title="緯度 lat">
-                  <input id="edit-lng-${stop.stop_id}" value="${stop.lng.toFixed(7)}" inputmode="decimal" title="經度 lng">
-                </div>
-                <div class="popup-actions" style="margin-top:5px;">
-                  <button class="popup-link" style="border:none;cursor:pointer;background:#f59e0b;color:#0f172a;" onclick="saveStopEdit(${stop.stop_id})" title="儲存為本機草稿"><i class="fa-solid fa-floppy-disk"></i> 儲存草稿</button>
-                  ${stop._edited ? `<button class="popup-link" style="border:none;cursor:pointer;background:#64748b;" onclick="revertStopEdit(${stop.stop_id})" title="還原此站"><i class="fa-solid fa-rotate-left"></i> 還原</button>` : ''}
-                </div>
-              </div>
-            `;
-          }
-
           marker.bindPopup(popupContent, { maxWidth: 300 });
           marker.on('click', () => highlightCard(stop.stop_id));
           markers[stop.stop_id] = marker;
@@ -1255,7 +1046,7 @@
             <div class="stop-photo-count"><i class="fa-solid fa-images"></i> ${stop.photo_count}</div>
           </div>
           <div class="stop-details">
-            <div class="stop-name">${stop.name}${stop._edited ? ' <span class="edited-tag">已編輯</span>' : ''}</div>
+            <div class="stop-name">${stop.name}</div>
             <div class="stop-time"><i class="fa-regular fa-clock"></i> ${stop.date} ${stop.time_display}</div>
             <div class="stop-loc">${stop.lat ? '<i class="fa-solid fa-map-pin"></i> ' + stop.location : badgeHtml}</div>
           </div>
