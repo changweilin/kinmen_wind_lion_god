@@ -64,13 +64,69 @@
     .popup-link { flex: 1; text-align: center; padding: 5px 3px; background: #2563eb; color: white; text-decoration: none; border-radius: 4px; font-size: 0.68rem; font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 3px; }
     .leaflet-control-layers { border-radius: 8px !important; box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important; font-size: 0.8rem !important; }
     .drop-overlay { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(37,99,235,0.88); color: white; z-index: 9999; justify-content: center; align-items: center; flex-direction: column; gap: 12px; font-size: 1.15rem; font-weight: 600; }
-    @media (max-width: 768px) { .main-container { flex-direction: column; } #sidebar { width: 100%; height: 45%; } #map { height: 55%; } }
+    /* 行動版 UI 元件：預設桌機隱藏 */
+    #menuToggle { display: none; }
+    #mobileTabs { display: none; }
+    #sheetHandle { display: none; }
+    #locateFab { display: none; }
+
+    /* 平板 (769px ~ 1024px)：側欄收窄、Header 緊湊 */
+    @media (max-width: 1024px) and (min-width: 769px) {
+      #sidebar { width: 320px; }
+      header h1 { font-size: 1rem; }
+      .btn { font-size: 0.78rem; padding: 6px 10px; }
+      .header-actions { flex-wrap: wrap; justify-content: flex-end; max-width: 55vw; }
+      .popup-box { width: 260px; }
+    }
+    /* 手機 / 小平板直向 (<=768px)：地圖 + 底部抽屜 + 分頁切換 */
+    @media (max-width: 768px) {
+      body { height: 100dvh; }
+      header { padding: 8px 12px; flex-wrap: wrap; gap: 8px; }
+      header h1 { font-size: 0.92rem; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #menuToggle { display: inline-flex; }
+      .header-actions { display: none; width: 100%; overflow-x: auto; padding-bottom: 2px; }
+      .header-actions.open { display: flex; }
+      .header-actions .btn { white-space: nowrap; min-height: 36px; }
+      .main-container { flex-direction: column; height: calc(100dvh - 52px - 48px); }
+      #map { flex: 1; height: auto; min-height: 0; }
+      #sidebar { width: 100%; height: 42%; border-left: none; border-top: 1px solid #e2e8f0; border-radius: 12px 12px 0 0; margin-top: -12px; padding-bottom: env(safe-area-inset-bottom); }
+      #sheetHandle { display: flex; justify-content: center; align-items: center; padding: 6px; cursor: pointer; touch-action: none; }
+      #sheetHandle::before { content: ""; width: 40px; height: 4px; border-radius: 2px; background: #cbd5e1; }
+      /* 地圖/列表全屏切換模式 */
+      .main-container.map-mode #sidebar { height: 30%; }
+      .main-container.list-mode #map { display: none; }
+      .main-container.list-mode #sidebar { flex: 1; height: auto; margin-top: 0; border-radius: 0; }
+      .main-container.map-mode #map { flex: 1; }
+      #mobileTabs { display: flex; gap: 8px; padding: 6px 10px calc(6px + env(safe-area-inset-bottom)); background: white; border-top: 1px solid #e2e8f0; z-index: 1000; }
+      #mobileTabs button { flex: 1; min-height: 40px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 0.85rem; font-weight: 600; color: #475569; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+      #mobileTabs button.active { background: #2563eb; color: white; border-color: #2563eb; }
+      #locateFab { display: flex; position: absolute; right: 12px; bottom: calc(30% + 20px); width: 44px; height: 44px; border-radius: 50%; border: none; background: white; color: #2563eb; box-shadow: 0 2px 8px rgba(0,0,0,0.25); z-index: 500; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; }
+      .main-container.list-mode #locateFab { display: none; }
+      .filter-bar { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+      .filter-btn { min-height: 32px; white-space: nowrap; flex-shrink: 0; }
+      .stop-card { padding: 12px 10px; }
+      .stop-thumb-box { width: 64px; height: 64px; }
+      .popup-box { width: min(290px, 78vw); }
+      .leaflet-popup-content { margin: 10px 12px !important; max-width: 82vw !important; }
+      .popup-main-img { height: 140px; }
+      .gallery-img { width: 64px; height: 48px; }
+      .popup-actions .popup-link { min-height: 36px; font-size: 0.72rem; }
+      .leaflet-control-layers { font-size: 0.75rem !important; max-width: 60vw; }
+    }
+    /* 超小手機 (<=380px) */
+    @media (max-width: 380px) {
+      header h1 { font-size: 0.82rem; }
+      #sidebar { height: 48%; }
+      .main-container.map-mode #sidebar { height: 34%; }
+      .stop-name { font-size: 0.85rem; }
+    }
   </style>
 </head>
 <body>
 
   <header>
     <h1><i class="fa-solid fa-flag"></i> 金門風獅爺巡禮尋訪地圖 (全 30 站・60 件影像)</h1>
+    <button class="btn" id="menuToggle" onclick="document.querySelector('.header-actions').classList.toggle('open')" title="功能選單"><i class="fa-solid fa-bars"></i></button>
     <div class="header-actions">
       <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none;" onchange="handleFiles(this.files)">
       <button class="btn btn-primary" onclick="document.getElementById('folderInput').click()">
@@ -85,6 +141,7 @@
   <div class="main-container" id="dropArea">
     <div id="map"></div>
     <div id="sidebar">
+      <div id="sheetHandle" title="拖曳展開/收合"></div>
       <div class="filter-bar">
         <button class="filter-btn active" onclick="setFilter('ALL')">全部 (30 站)</button>
         <button class="filter-btn" onclick="setFilter('2026-09-10')">9/10 (1 站)</button>
@@ -103,7 +160,13 @@
       <i class="fa-solid fa-cloud-arrow-up fa-3x"></i>
       <p>放開滑鼠即可自動讀取每張照片 EXIF GPS，自動整合各站風獅爺旗標！</p>
     </div>
+    <button id="locateFab" onclick="fitAllMarkers()" title="顯示全部站點"><i class="fa-solid fa-expand"></i></button>
   </div>
+
+  <nav id="mobileTabs">
+    <button id="tabMap" class="active" onclick="setMobileView('map')"><i class="fa-solid fa-map"></i> 地圖</button>
+    <button id="tabList" onclick="setMobileView('list')"><i class="fa-solid fa-list"></i> 站點列表</button>
+  </nav>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
@@ -680,7 +743,9 @@
         "🎨 CartoDB 全彩圖": cartoVoyager
       };
 
-      L.control.layers(baseMaps, null, { position: 'topright', collapsed: false }).addTo(map);
+      L.control.layers(baseMaps, null, { position: 'topright', collapsed: window.innerWidth <= 768 }).addTo(map);
+
+      initMobileUI();
 
       loadVisualOverrides();
       renderMarkers();
@@ -803,6 +868,7 @@
 
     function focusStop(stop) {
       highlightCard(stop.stop_id);
+      if (window.innerWidth <= 768) setMobileView('map');
       if (stop.lat && stop.lng && markers[stop.stop_id]) {
         map.flyTo([stop.lat, stop.lng], 16, { duration: 1 });
         markers[stop.stop_id].openPopup();
@@ -918,6 +984,49 @@
         handleFiles(e.dataTransfer.files);
       }
     });
+
+    // ===== 手機/平板 UI：地圖/列表切換 + 底部抽屜拖曳 =====
+    function setMobileView(mode) {
+      if (window.innerWidth > 768) return;
+      const c = document.getElementById('dropArea');
+      c.classList.toggle('map-mode', mode !== 'list');
+      c.classList.toggle('list-mode', mode === 'list');
+      document.getElementById('tabMap').classList.toggle('active', mode !== 'list');
+      document.getElementById('tabList').classList.toggle('active', mode === 'list');
+      if (map) setTimeout(() => map.invalidateSize(), 250);
+    }
+    function fitAllMarkers() {
+      const group = Object.values(markers);
+      if (group.length > 0) map.fitBounds(L.featureGroup(group).getBounds().pad(0.1));
+    }
+    function initMobileUI() {
+      setMobileView('map');
+      const handle = document.getElementById('sheetHandle');
+      const sidebar = document.getElementById('sidebar');
+      let startY = 0, startH = 0, dragging = false;
+      handle.addEventListener('pointerdown', e => {
+        if (window.innerWidth > 768) return;
+        dragging = true; startY = e.clientY; startH = sidebar.getBoundingClientRect().height;
+        handle.setPointerCapture(e.pointerId);
+      });
+      handle.addEventListener('pointermove', e => {
+        if (!dragging) return;
+        const dh = startY - e.clientY;
+        const total = document.getElementById('dropArea').getBoundingClientRect().height;
+        let pct = ((startH + dh) / total) * 100;
+        pct = Math.max(20, Math.min(85, pct));
+        sidebar.style.height = pct + '%';
+      });
+      handle.addEventListener('pointerup', () => {
+        dragging = false; sidebar.style.height = '';
+        if (map) setTimeout(() => map.invalidateSize(), 200);
+      });
+      handle.addEventListener('click', () => {
+        const c = document.getElementById('dropArea');
+        setMobileView(c.classList.contains('list-mode') ? 'map' : 'list');
+      });
+      window.addEventListener('resize', () => { if (map) map.invalidateSize(); });
+    }
 
     window.onload = initMap;
   </script>
