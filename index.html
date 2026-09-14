@@ -66,27 +66,24 @@
     .drop-overlay { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(37,99,235,0.88); color: white; z-index: 9999; justify-content: center; align-items: center; flex-direction: column; gap: 12px; font-size: 1.15rem; font-weight: 600; }
     /* ===== 導覽播放器：一男一女騎機車軌跡導航 ===== */
     #map { position: relative; }
-    #tourCard {
-      position: absolute; top: 12px; left: 12px; width: 340px; max-width: calc(100% - 24px);
-      background: rgba(255,255,255,0.97); border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,0.25);
-      z-index: 600; overflow: hidden; border: 1px solid #e2e8f0; display: none;
-    }
-    #tourCard.show { display: block; }
-    .tour-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: linear-gradient(135deg, #1e3a8a, #2563eb); color: white; }
-    .tour-num { background: #f59e0b; color: #0f172a; font-weight: 800; font-size: 0.8rem; border-radius: 6px; padding: 2px 8px; white-space: nowrap; }
-    .tour-title { flex: 1; font-weight: 700; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .tour-close { background: rgba(255,255,255,0.2); border: none; color: white; border-radius: 6px; width: 26px; height: 26px; cursor: pointer; font-size: 0.8rem; }
-    .tour-close:hover { background: rgba(255,255,255,0.35); }
-    .tour-meta { padding: 6px 10px 2px; font-size: 0.74rem; color: #475569; }
-    .tour-collage { display: flex; gap: 6px; padding: 8px 10px 4px; }
-    .collage-main { flex: 1.4; min-width: 0; }
-    .collage-main img { width: 100%; height: 170px; object-fit: cover; border-radius: 8px; border: 2px solid #2563eb; cursor: pointer; display: block; }
-    .collage-subs { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; align-content: start; max-height: 170px; overflow-y: auto; }
-    .collage-subs img { width: 100%; height: 53px; object-fit: cover; border-radius: 6px; border: 1px solid #cbd5e1; cursor: pointer; display: block; }
-    .collage-subs img:hover, .collage-main img:hover { opacity: 0.85; }
-    .collage-subs.single { display: flex; align-items: center; justify-content: center; background: #f1f5f9; border-radius: 6px; font-size: 0.72rem; color: #64748b; padding: 8px; text-align: center; }
-    .tour-foot { display: flex; align-items: center; justify-content: space-between; padding: 4px 10px 8px; font-size: 0.72rem; color: #64748b; }
-    .tour-foot a { color: #2563eb; text-decoration: none; font-weight: 600; }
+    /* 照片資訊卡：綁在機車游標上，顯示於游標正上方；抵達時地圖將其置中 */
+    .tour-popup .leaflet-popup-content-wrapper { border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 6px 24px rgba(0,0,0,0.3); }
+    .tour-popup .leaflet-popup-content { margin: 10px 12px; width: 300px !important; line-height: 1.4; }
+    .tp-head { display: flex; align-items: center; gap: 6px; background: linear-gradient(135deg, #1e3a8a, #2563eb); color: white; border-radius: 8px; padding: 6px 8px; margin-bottom: 6px; }
+    .tp-num { background: #f59e0b; color: #0f172a; font-weight: 800; font-size: 0.78rem; border-radius: 6px; padding: 2px 7px; white-space: nowrap; }
+    .tp-title { flex: 1; font-weight: 700; font-size: 0.86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tp-x { background: rgba(255,255,255,0.2); border: none; color: white; border-radius: 6px; width: 24px; height: 24px; cursor: pointer; font-size: 0.75rem; flex-shrink: 0; }
+    .tp-x:hover { background: rgba(255,255,255,0.35); }
+    .tp-meta { font-size: 0.73rem; color: #475569; }
+    .tp-collage { display: flex; gap: 6px; margin-top: 6px; }
+    .tp-main { width: 168px; height: 150px; object-fit: cover; border-radius: 8px; border: 2px solid #2563eb; cursor: pointer; display: block; flex-shrink: 0; }
+    .tp-main:hover { opacity: 0.88; }
+    .tp-subs { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; align-content: start; max-height: 150px; overflow-y: auto; }
+    .tp-subs img { width: 100%; height: 46px; object-fit: cover; border-radius: 5px; border: 1px solid #cbd5e1; cursor: pointer; display: block; }
+    .tp-subs img:hover { opacity: 0.85; border-color: #2563eb; }
+    .tp-single { flex: 1; display: flex; align-items: center; justify-content: center; background: #f1f5f9; border-radius: 6px; font-size: 0.7rem; color: #64748b; text-align: center; padding: 6px; }
+    .tp-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; font-size: 0.7rem; color: #64748b; }
+    .tp-foot a { color: #2563eb; text-decoration: none; font-weight: 600; }
     #playerBar {
       position: absolute; left: 12px; bottom: 12px; z-index: 600;
       width: min(600px, calc(100% - 24px));
@@ -173,12 +170,12 @@
       .main-container.map-mode #sidebar { height: 34%; }
       .stop-name { font-size: 0.85rem; }
     }
-    /* 導覽播放器 RWD：手機上縮小拼貼卡、播放器貼齊地圖底部 */
+    /* 導覽播放器 RWD：手機上縮小游標上的照片卡、播放器貼齊地圖底部 */
     @media (max-width: 768px) {
-      #tourCard { top: 8px; left: 8px; width: min(300px, calc(100% - 16px)); }
-      .collage-main img { height: 130px; }
-      .collage-subs { max-height: 130px; }
-      .collage-subs img { height: 40px; }
+      .tour-popup .leaflet-popup-content { width: min(250px, 68vw) !important; }
+      .tp-main { width: 138px; height: 118px; }
+      .tp-subs { max-height: 118px; }
+      .tp-subs img { height: 36px; }
       #playerBar { left: 8px; bottom: 8px; width: calc(100% - 16px); padding: 6px 8px; }
       #tourLabel { min-width: 64px; }
       .pbtn { min-width: 32px; height: 32px; }
@@ -203,21 +200,7 @@
 
   <div class="main-container" id="dropArea">
     <div id="map">
-      <!-- 導覽拼貼卡：一張主圖 + 其餘副圖 -->
-      <div id="tourCard">
-        <div class="tour-head">
-          <span class="tour-num" id="tourNum">#01</span>
-          <span class="tour-title" id="tourTitle">尚未開始導覽</span>
-          <button class="tour-close" onclick="stopTour()" title="關閉導覽"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-        <div class="tour-meta" id="tourMeta"></div>
-        <div class="tour-collage">
-          <div class="collage-main"><img id="tourMainImg" src="" alt="主圖" onclick="openTourMain()"></div>
-          <div class="collage-subs" id="tourSubs"></div>
-        </div>
-        <div class="tour-foot"><span id="tourCount"></span><a id="tourDrive" href="#" target="_blank"><i class="fa-brands fa-google-drive"></i> 原圖</a></div>
-      </div>
-      <!-- 播放器：播放/暫停/上下站/停止/速度/進度 -->
+      <!-- 播放器：播放/暫停/上下站/停止/速度/進度；照片資訊卡改綁在機車游標正上方 -->
       <div id="playerBar">
         <div class="player-row">
           <button class="pbtn" onclick="stepTour(-1)" title="上一站"><i class="fa-solid fa-backward-step"></i></button>
@@ -236,7 +219,7 @@
           </div>
           <div class="player-sub">
             <label><input type="checkbox" id="followChk" checked> 跟隨</label>
-            <label><input type="checkbox" id="routeChk" checked onchange="toggleRouteLine(this.checked)"> 路線</label>
+            <label><input type="checkbox" id="routeChk" checked onchange="toggleRouteLine(this.checked)" title="顯示/隱藏軌跡線"> 軌跡</label>
             <label><input type="checkbox" id="loopChk"> 循環</label>
             <span id="tourStopName">🛵 一男一女・機車環島導覽</span>
           </div>
@@ -1133,8 +1116,12 @@
 
     // ===== 導覽播放器：一男一女騎機車・運動軌跡式導航 =====
     // 順序播放 30 站；多照片站以拼貼呈現（一張主圖＋其餘副圖，點副圖可切換主圖）
-    const tour = { playing: false, idx: 0, speed: 1, timer: null, raf: null, baseMs: 3500, mainPhotoIdx: 0 };
-    let routeFull = null, routeDone = null, scooterMarker = null;
+    const tour = { playing: false, idx: 0, speed: 1, timer: null, raf: null, mainPhotoIdx: 0 };
+    const TRAVEL_MS = 2200; // 機車跑每一條線的固定時間（1x 時；與距離無關，每腿相同）
+    const DWELL_MS = 1200;  // 抵達後停留展示時間（1x 時）
+    const TRAIL_OPACITY = [0.95, 0.5, 0.22]; // 當前腿 t、t-1、t-2 漸近淡出；t-3 以前不顯示
+    const TRAIL_POPUP_TIP = 107; // 照片卡尖端高出機車錨點的像素（popupAnchor -62 ＋ popup offset -45）
+    let trailStatic = null, trailLive = null, scooterMarker = null, tourPopup = null;
 
     function tourStops() { return [...stopsData].sort((a, b) => a.stop_id - b.stop_id); }
     function tourSliderSync() {
@@ -1172,116 +1159,166 @@
         iconSize: [70, 72], iconAnchor: [35, 62], popupAnchor: [0, -62]
       });
     }
-    // 運動地圖式軌跡：全程淡色虛線（待走）＋ 橘色實線（已走）
+    // 軌跡線：不畫全程虛線；每條腿依兩端站點彩虹色做漸進色，只保留最近 3 腿（t、t-1、t-2 漸近淡出）
+    function rainbowHSL(stopId, total) {
+      const n = total || tourStops().length || 30;
+      return { h: ((stopId - 1) / (n - 1)) * 315, s: 88, l: 45 };
+    }
+    function lerpHSL(a, b, t) { return { h: a.h + (b.h - a.h) * t, s: a.s + (b.s - a.s) * t, l: a.l + (b.l - a.l) * t }; }
+    function hslStr(c) { return `hsl(${Math.round(c.h)},${Math.round(c.s)}%,${Math.round(c.l)}%)`; }
+    // 兩點之間畫漸進色：切成小段，顏色在起迄色之間內插；frac<1 時只畫前段（行進中的生長效果）
+    function drawGradientLeg(group, latA, lngA, latB, lngB, cA, cB, frac, opacity) {
+      const f = Math.max(0.0001, Math.min(1, frac));
+      const n = Math.max(1, Math.round(14 * f));
+      for (let k = 0; k < n; k++) {
+        const t0 = (k / n) * f, t1 = ((k + 1) / n) * f, tm = (t0 + t1) / 2;
+        const p0 = [latA + (latB - latA) * t0, lngA + (lngB - lngA) * t0];
+        const p1 = [latA + (latB - latA) * t1, lngA + (lngB - lngA) * t1];
+        L.polyline([p0, p1], { color: hslStr(lerpHSL(cA, cB, tm)), weight: 5, opacity, interactive: false }).addTo(group);
+      }
+    }
+    function drawStopLeg(group, stopA, stopB, frac, opacity) {
+      if (!stopA || !stopB || !stopA.lat || !stopB.lat) return;
+      drawGradientLeg(group, stopA.lat, stopA.lng, stopB.lat, stopB.lng,
+        rainbowHSL(stopA.stop_id), rainbowHSL(stopB.stop_id), frac, opacity);
+    }
+    // 重繪靜態軌跡：只留 [idx-1, idx-2, idx-3] 三腿（t、t-1、t-2），t-3 以前不顯示
+    function drawTrailStatic(idx, includeCurrent) {
+      if (!trailStatic) return;
+      trailStatic.clearLayers();
+      const list = tourStops();
+      const legs = includeCurrent ? [idx - 1, idx - 2, idx - 3] : [idx - 2, idx - 3];
+      legs.forEach((j, rank) => {
+        if (j >= 0 && list[j] && list[j + 1]) drawStopLeg(trailStatic, list[j], list[j + 1], 1, TRAIL_OPACITY[rank]);
+      });
+    }
     function buildTourRoute() {
       if (!map) return;
-      const pts = tourStops().filter(s => s.lat && s.lng).map(s => [s.lat, s.lng]);
-      if (routeFull) { map.removeLayer(routeFull); routeFull = null; }
-      if (routeDone) { map.removeLayer(routeDone); routeDone = null; }
       if (scooterMarker) { map.removeLayer(scooterMarker); scooterMarker = null; }
-      if (!pts.length) return;
+      if (!trailStatic) trailStatic = L.layerGroup();
+      if (!trailLive) trailLive = L.layerGroup();
+      trailStatic.clearLayers(); trailLive.clearLayers();
+      const list = tourStops().filter(s => s.lat && s.lng);
+      if (!list.length) return;
       const show = document.getElementById('routeChk') ? document.getElementById('routeChk').checked : true;
-      routeFull = L.polyline(pts, { color: '#94a3b8', weight: 3, opacity: 0.7, dashArray: '7 7' });
-      routeDone = L.polyline([pts[0]], { color: '#f59e0b', weight: 5, opacity: 0.95 });
-      if (show) { routeFull.addTo(map); routeDone.addTo(map); }
-      scooterMarker = L.marker(pts[0], { icon: scooterIcon(tourStops()[0], false), zIndexOffset: 1000, interactive: false }).addTo(map);
-      refreshRouteDone();
-    }
-    function refreshRouteDone() {
-      if (!routeDone || !scooterMarker) return;
-      const pts = tourStops().filter(s => s.lat && s.lng).map(s => [s.lat, s.lng]);
-      const cur = scooterMarker.getLatLng();
-      routeDone.setLatLngs([...pts.slice(0, tour.idx + 1), [cur.lat, cur.lng]]);
+      if (show) { trailStatic.addTo(map); trailLive.addTo(map); }
+      if (!tourPopup) {
+        tourPopup = L.popup({ closeButton: false, autoPan: false, closeOnClick: false, className: 'tour-popup', offset: L.point(0, -45), maxWidth: 340, minWidth: 280 });
+      } else { map.closePopup(tourPopup); }
+      scooterMarker = L.marker([list[0].lat, list[0].lng], { icon: scooterIcon(list[0], false), zIndexOffset: 1000, interactive: false }).addTo(map);
+      scooterMarker.bindPopup(tourPopup);
+      drawTrailStatic(0, false);
     }
     function toggleRouteLine(on) {
-      if (!map || !routeFull || !routeDone) return;
-      if (on) { routeFull.addTo(map); routeDone.addTo(map); }
-      else { map.removeLayer(routeFull); map.removeLayer(routeDone); }
+      if (!map || !trailStatic || !trailLive) return;
+      if (on) { trailStatic.addTo(map); trailLive.addTo(map); }
+      else { map.removeLayer(trailStatic); map.removeLayer(trailLive); }
     }
-    // 拼貼：一張主圖＋其餘副圖；點副圖與主圖互換
-    function renderTourCollage(stop) {
-      const mainImg = document.getElementById('tourMainImg');
-      const subsBox = document.getElementById('tourSubs');
-      if (!mainImg || !subsBox || !stop) return;
+    // 照片資訊卡（拼貼）：一張主圖＋其餘副圖；塞進機車游標正上方的 popup，點副圖換主圖
+    function tourPopupHtml(stop) {
       if (tour.mainPhotoIdx >= stop.photos.length) tour.mainPhotoIdx = 0;
       const main = stop.photos[tour.mainPhotoIdx];
-      mainImg.src = main.localUrl || main.thumbnailUrl;
-      mainImg.onerror = function () { this.src = svgFallback; };
-      mainImg.alt = `${stop.name} 主圖`;
-      subsBox.innerHTML = '';
+      const color = getRainbowColor(stop.stop_id);
+      const mainSrc = main.localUrl || main.thumbnailUrl;
+      let subs;
       if (stop.photos.length <= 1) {
-        subsBox.className = 'collage-subs single';
-        subsBox.innerHTML = '<div>本尊獨照・僅 1 張<br>📷 點主圖開原圖</div>';
+        subs = '<div class="tp-single">本尊獨照・僅 1 張<br>📷 點主圖開原圖</div>';
       } else {
-        subsBox.className = 'collage-subs';
-        stop.photos.forEach((p, i) => {
-          if (i === tour.mainPhotoIdx) return;
-          const im = document.createElement('img');
-          im.src = p.localUrl || p.thumbnailUrl;
-          im.onerror = function () { this.src = svgFallback; };
-          im.title = `副圖 ${i + 1}・${p.time}（點我換成主圖）`;
-          im.onclick = () => { tour.mainPhotoIdx = i; renderTourCollage(stop); };
-          subsBox.appendChild(im);
-        });
+        subs = '<div class="tp-subs">' + stop.photos.map((p, i) => i === tour.mainPhotoIdx ? '' :
+          `<img src="${p.localUrl || p.thumbnailUrl}" onerror="this.src='${svgFallback}'" title="副圖 ${i + 1}・${p.time}（點我換成主圖）" onclick="swapTourMainPopup(${i})">`).join('') + '</div>';
       }
-      document.getElementById('tourDrive').href = main.viewUrl;
-      document.getElementById('tourCount').textContent = `📷 ${stop.photo_count} 張・主圖 ${tour.mainPhotoIdx + 1}/${stop.photos.length}`;
+      return `<div class="tp-head"><span class="tp-num" style="background:${color};">${stop.stop_number}</span>`
+        + `<span class="tp-title">${stop.name}</span><button class="tp-x" onclick="stopTour()" title="關閉導覽">✕</button></div>`
+        + `<div class="tp-meta"><i class="fa-regular fa-clock"></i> ${stop.date} ${stop.time_display}<br><i class="fa-solid fa-location-dot"></i> ${stop.location}</div>`
+        + `<div class="tp-collage"><img class="tp-main" src="${mainSrc}" onerror="this.src='${svgFallback}'" alt="${stop.name} 主圖" onclick="openTourMain()" title="點我開原圖">${subs}</div>`
+        + `<div class="tp-foot"><span>📷 ${stop.photo_count} 張・主圖 ${tour.mainPhotoIdx + 1}/${stop.photos.length}</span><a href="${main.viewUrl}" target="_blank"><i class="fa-brands fa-google-drive"></i> 原圖</a></div>`;
+    }
+    function openTourPopup(stop) {
+      if (!scooterMarker || !tourPopup) return;
+      tourPopup.setContent(tourPopupHtml(stop));
+      tourPopup.setLatLng(scooterMarker.getLatLng());
+      scooterMarker.openPopup();
+    }
+    function swapTourMainPopup(i) {
+      const stop = tourStops()[tour.idx];
+      if (!stop || !tourPopup) return;
+      tour.mainPhotoIdx = i;
+      tourPopup.setContent(tourPopupHtml(stop)); // 只換照片，不搬動地圖
     }
     function openTourMain() {
       const stop = tourStops()[tour.idx];
       if (stop && stop.photos[tour.mainPhotoIdx]) window.open(stop.photos[tour.mainPhotoIdx].viewUrl, '_blank');
     }
+    // 抵達時移動地圖，把游標上方的照片資訊卡置於畫面正中間
+    function centerTourPopup() {
+      if (!map || !scooterMarker || !tourPopup || !map.hasLayer(tourPopup)) return;
+      requestAnimationFrame(() => {
+        const wrap = document.querySelector('.tour-popup .leaflet-popup-content-wrapper');
+        const H = wrap ? wrap.offsetHeight : 330;
+        const mp = map.latLngToContainerPoint(scooterMarker.getLatLng());
+        const popupCenter = mp.subtract(L.point(0, TRAIL_POPUP_TIP + H / 2));
+        map.panTo(map.containerPointToLatLng(popupCenter), { animate: true, duration: 0.8 });
+      });
+    }
+    function isFollowOn() {
+      const c = document.getElementById('followChk');
+      return c ? c.checked : true;
+    }
     function showTourStop(i, opts = {}) {
       const list = tourStops();
       if (!list.length || !map) return;
-      const prev = list[tour.idx];
+      if (!scooterMarker) buildTourRoute();
+      const fromStop = list[tour.idx];
       tour.idx = Math.max(0, Math.min(list.length - 1, i));
       tour.mainPhotoIdx = 0;
       const stop = list[tour.idx];
-      document.getElementById('tourCard').classList.add('show');
-      document.getElementById('tourNum').textContent = stop.stop_number;
-      document.getElementById('tourNum').style.background = getRainbowColor(stop.stop_id);
-      document.getElementById('tourTitle').textContent = stop.name;
-      document.getElementById('tourMeta').innerHTML =
-        `<div><i class="fa-regular fa-clock"></i> ${stop.date} ${stop.time_display}</div>`
-        + `<div><i class="fa-solid fa-location-dot"></i> ${stop.location}</div>`;
-      renderTourCollage(stop);
       document.getElementById('tourStopName').textContent = `🛵 ${stop.stop_number} ${stop.name}`;
       tourSliderSync();
       highlightCard(stop.stop_id);
-      // 機車從上一站平滑騎到本站（運動軌跡動畫）
-      if (scooterMarker && stop.lat && stop.lng) {
+      openTourPopup(stop); // 照片資訊掛在機車游標上方，行進間跟著走
+      if (stop.lat && stop.lng) {
         const from = scooterMarker.getLatLng();
         const to = L.latLng(stop.lat, stop.lng);
-        const legMs = opts.instant ? 0 : (tour.baseMs / tour.speed) * 0.85;
-        animateScooter(from, to, legMs, stop);
-      }
-      const follow = document.getElementById('followChk') ? document.getElementById('followChk').checked : true;
-      if (follow && stop.lat && stop.lng) {
-        if (opts.instant || !prev || Math.abs((prev.lat || 0) - stop.lat) + Math.abs((prev.lng || 0) - stop.lng) > 0.05) map.flyTo([stop.lat, stop.lng], 14, { duration: 1 });
-        else map.panTo([stop.lat, stop.lng], { animate: true });
+        if (opts.instant) {
+          if (tour.raf) { cancelAnimationFrame(tour.raf); tour.raf = null; }
+          scooterMarker.setLatLng(to);
+          scooterMarker.setIcon(scooterIcon(stop, to.lng < from.lng));
+          tourPopup.setLatLng(to);
+          if (trailLive) trailLive.clearLayers();
+          drawTrailStatic(tour.idx, true);
+          if (isFollowOn()) centerTourPopup();
+        } else {
+          drawTrailStatic(tour.idx, false); // 行進間只留舊的兩腿，當前腿由 live 逐幀生長
+          if (trailLive) trailLive.clearLayers();
+          animateScooter(from, to, TRAVEL_MS / tour.speed, fromStop, stop);
+        }
       }
     }
-    // 兩點間線性內插，逐幀更新機車位置＋已走軌跡尾端
-    function animateScooter(from, to, durMs, stop) {
+    // 機車沿當前腿線性內插：每條腿固定 TRAVEL_MS（與距離無關），逐幀更新位置＋漸進色生長＋popup 跟隨
+    function animateScooter(from, to, durMs, stopA, stopB) {
       if (tour.raf) cancelAnimationFrame(tour.raf);
       if (!scooterMarker) return;
-      if (!durMs || durMs <= 0) {
-        scooterMarker.setLatLng(to);
-        scooterMarker.setIcon(scooterIcon(stop, to.lng < from.lng));
-        refreshRouteDone();
-        return;
-      }
-      const t0 = performance.now();
       const flip = to.lng < from.lng;
-      scooterMarker.setIcon(scooterIcon(stop, flip));
+      scooterMarker.setIcon(scooterIcon(stopB, flip));
+      const cA = stopA ? rainbowHSL(stopA.stop_id) : rainbowHSL(stopB.stop_id);
+      const cB = rainbowHSL(stopB.stop_id);
+      const t0 = performance.now();
       const step = (now) => {
         const k = Math.min(1, (now - t0) / durMs);
         const lat = from.lat + (to.lat - from.lat) * k;
         const lng = from.lng + (to.lng - from.lng) * k;
         scooterMarker.setLatLng([lat, lng]);
-        refreshRouteDone();
-        if (k < 1 && tour.raf !== null) tour.raf = requestAnimationFrame(step);
+        if (tourPopup && map.hasLayer(tourPopup)) tourPopup.setLatLng([lat, lng]);
+        if (trailLive) {
+          trailLive.clearLayers();
+          drawGradientLeg(trailLive, from.lat, from.lng, to.lat, to.lng, cA, cB, k, TRAIL_OPACITY[0]);
+        }
+        if (isFollowOn() && !map.getBounds().pad(-0.15).contains([lat, lng])) map.panTo([lat, lng], { animate: true });
+        if (k < 1 && tour.raf !== null) { tour.raf = requestAnimationFrame(step); return; }
+        tour.raf = null;
+        if (trailLive) trailLive.clearLayers();
+        drawTrailStatic(tour.idx, true); // 抵達：當前腿完整入列，t-3 以前的不留
+        if (isFollowOn()) centerTourPopup(); // 抵達：移動地圖讓照片資訊置中
       };
       tour.raf = requestAnimationFrame(step);
     }
@@ -1299,14 +1336,13 @@
           if (document.getElementById('loopChk') && document.getElementById('loopChk').checked) showTourStop(0);
           else { pauseTour(); return; }
         } else showTourStop(tour.idx + 1);
-      }, tour.baseMs / tour.speed);
+      }, (TRAVEL_MS + DWELL_MS) / tour.speed);
     }
     function pauseTour() { tour.playing = false; clearTourTimer(); if (tour.raf) { cancelAnimationFrame(tour.raf); tour.raf = null; } updatePlayBtn(); }
     function togglePlay() { tour.playing ? pauseTour() : startTour(); }
     function stopTour() {
       pauseTour();
-      const card = document.getElementById('tourCard');
-      if (card) card.classList.remove('show');
+      if (map && tourPopup) map.closePopup(tourPopup);
     }
     function stepTour(d) {
       const wasPlaying = tour.playing;
