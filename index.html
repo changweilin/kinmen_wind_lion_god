@@ -1925,6 +1925,7 @@
       threeLib: typeof THREE !== 'undefined', threeOK, hasRenderer: !!threeR,
       lions: (typeof threeLions !== 'undefined') ? threeLions.size : -1,
       bearing: (typeof map3d !== 'undefined' && map3d) ? map3d.getBearing() : null,
+      pitch: (typeof map3d !== 'undefined' && map3d) ? map3d.getPitch() : null,
       overlay: (typeof threeOverlay !== 'undefined' && threeOverlay) ? [threeOverlay._w, threeOverlay._h] : null,
       markerMode: window.__markerMode || '?'
     });
@@ -2228,16 +2229,26 @@
       if (!is3D || !map3dReady || !threeOK || !threeR || !threeOverlay || !threeOverlay._w) return;
       const w = threeOverlay._w, h = threeOverlay._h, cx = w / 2, cy = h / 2;
       const zoom = map3d.getZoom(), mapB = map3d.getBearing(), t = performance.now() / 1000, m = 60;
+      // 垂直旋轉跟隨：pitch 改變時指示物跟著俯仰（tipX）＋遠近透視縮放；水平旋轉由 yaw 處理
+      const pitch = map3d.getPitch();
+      const tipX = THREE.MathUtils.degToRad(62 - pitch);
+      const sinP = Math.sin(pitch * Math.PI / 180);
+      const camD = (map3d.transform && map3d.transform.cameraToCenterDistance) || (h * 1.5);
+      const perspAt = (py) => {
+        const v = camD / (camD + (cy - py) * sinP);
+        return Math.max(0.5, Math.min(1.8, v));
+      };
       threeLions.forEach(o => {
         const p = map3d.project([o.stop.lng, o.stop.lat]);
         if (p.x < -m || p.y < -m || p.x > w + m || p.y > h + m) { o.group.visible = false; return; }
         o.group.visible = true;
         const r = threeScaleFor(THREE_PX.lion, o.h, zoom);
-        // 不轉動：呼吸（縮放＋浮動）代替自轉；面向相對地圖固定，地圖旋轉時跟著轉
+        // 不自轉：呼吸（縮放＋浮動）代替自轉；面向相對地圖固定（水平跟 yaw、垂直跟 tipX＋透視）
         const br = Math.sin(t * 2 + o.phase);
-        o.group.scale.setScalar(r.s * (1 + 0.018 * br));
-        o.group.position.set((p.x - cx) * r.wpp, (cy - p.y) * r.wpp + br * r.s * 0.03, p.y * 0.0004);
-        o.group.rotation.set(0, Math.PI - THREE.MathUtils.degToRad((o.face === undefined ? 180 : o.face) - mapB), 0);
+        const ps = perspAt(p.y);
+        o.group.scale.setScalar(r.s * (1 + 0.018 * br) * ps);
+        o.group.position.set((p.x - cx) * r.wpp, (cy - p.y) * r.wpp + br * r.s * ps * 0.03, p.y * 0.0004);
+        o.group.rotation.set(tipX, Math.PI - THREE.MathUtils.degToRad((o.face === undefined ? 180 : o.face) - mapB), 0);
       });
       if (threeScoot) {
         const sc = threeScoot;
@@ -2246,17 +2257,18 @@
         else {
           sc.group.visible = true;
           const r = threeScaleFor(THREE_PX.scoot, sc.h, zoom);
-          sc.group.scale.setScalar(r.s);
+          const ps = perspAt(p.y);
+          sc.group.scale.setScalar(r.s * ps);
           sc.group.position.set((p.x - cx) * r.wpp, (cy - p.y) * r.wpp, 1);
-          // 機車朝向＝地理行進方位，相對地圖固定（地圖旋轉時跟著轉）
+          // 機車朝向＝地理行進方位，相對地圖固定（水平跟 yaw、垂直跟 tipX＋透視）
           const mapRel = (((sc.hdg - mapB) % 360) + 360) % 360;
           const target = THREE.MathUtils.degToRad(90 - mapRel);
           let d = target - sc.yaw;
           while (d > Math.PI) d -= Math.PI * 2;
           while (d < -Math.PI) d += Math.PI * 2;
           sc.yaw += d * 0.12;
-          sc.group.rotation.set(0, sc.yaw, Math.sin(t * 7) * 0.02);
-          sc.group.position.y += Math.abs(Math.sin(t * 7)) * r.s * 0.05;
+          sc.group.rotation.set(tipX, sc.yaw, Math.sin(t * 7) * 0.02);
+          sc.group.position.y += Math.abs(Math.sin(t * 7)) * r.s * ps * 0.05;
           (sc.wheels || []).forEach(wh => {
             wh.userData.spin = (wh.userData.spin || 0) + 0.3;
             wh.rotation.set(Math.PI / 2, wh.userData.spin, 0);
