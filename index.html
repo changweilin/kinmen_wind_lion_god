@@ -1495,6 +1495,7 @@
     const DWELL_MS = 1200;  // 抵達後停留展示時間（1x 時）
     const TEMPO3D = 2;      // 3D 版行進＋停留皆為 2D 的 2 倍時長
     function travelMs() { return TRAVEL_MS * (typeof is3D !== 'undefined' && is3D ? TEMPO3D : 1) / tour.speed; }
+    function dwellMs() { return DWELL_MS * (typeof is3D !== 'undefined' && is3D ? TEMPO3D : 1) / tour.speed; }
     function legIntervalMs() { return (TRAVEL_MS + DWELL_MS) * (typeof is3D !== 'undefined' && is3D ? TEMPO3D : 1) / tour.speed; }
     const TRAIL_OPACITY = [0.95, 0.5, 0.22]; // 當前腿 t、t-1、t-2 漸近淡出；t-3 以前不顯示
     const TRAIL_POPUP_TIP = 42; // 照片卡尖端高出站點旗標錨點的像素（旗標高32px＋10px空隙；獨立 popup offset）
@@ -1817,7 +1818,27 @@
           }
           if (isFollowOn()) centerTourPopup();
           if (fromStop && fromStop !== stop) ensureLegGeom(fromStop, stop); // 背景預取，轉完整道路線
+          return true;
         } else {
+          // 播放第一站（機車已在該站上）：直接跳資訊卡，不需要等待行進時間；
+          // 只在機車物理位置已接近目標站時才直接顯示，避免調速/暫停續播時中途跳卡
+          if (fromStop === stop && from.distanceTo(to) < 30) {
+            if (tour.raf) { cancelAnimationFrame(tour.raf); tour.raf = null; }
+            ++tour.animId;
+            tour.arrived = true;
+            scooterMarker.setLatLng(to);
+            scooterMarker.setIcon(scooterIcon(stop, flip));
+            if (tourPopup) tourPopup.setLatLng(to);
+            if (trailLive) trailLive.clearLayers();
+            drawTrailStatic(tour.idx, true);
+            if (typeof map3dReady !== 'undefined' && map3dReady) {
+              syncScooter3DToCurrent(false);
+              if (map3d.getSource('tour-live')) map3d.getSource('tour-live').setData({ type: 'FeatureCollection', features: [] });
+            }
+            openTourPopup(stop);
+            if (isFollowOn()) centerTourPopup();
+            return true;
+          }
           drawTrailStatic(tour.idx, false); // 行進間只留舊的兩腿，當前腿由 live 逐幀生長
           if (trailLive) trailLive.clearLayers();
           const cA = fromStop ? rainbowHSL(fromStop.stop_id) : rainbowHSL(stop.stop_id);
@@ -1827,6 +1848,7 @@
             if (myReq !== tour.reqSeq) return;
             animateScooter(path, cA, cB, travelMs(), stop, flip);
           });
+          return false;
         }
       }
     }
@@ -1851,7 +1873,7 @@
           drawGradientPath(trailLive, pathPts, cA, cB, k, TRAIL_OPACITY[0]);
           if (typeof map3dReady !== 'undefined' && map3dReady && is3D) drawLive3D(pathPts, k, hslStr(cB));
         }
-        // 3D 跟隨運鏡：機車朝向＋低空追蹤，比 2D 更動態
+        // 3D 跟隨運鏡：只在機車快離開螢幕視野時才跟著移動，不置中追蹤
         if (typeof map3dReady !== 'undefined' && map3dReady && is3D && isFollowOn() && total) {
           const ahead = pointAtPath(pathPts, cum, total, Math.min(1, k + 0.02));
           const hdg = bearingBetween([pos[0], pos[1]], [ahead[0], ahead[1]]);
@@ -1860,9 +1882,23 @@
             sc.lng = pos[1]; sc.lat = pos[0];
             sc.hdg = hdg; // 存地理方位，渲染時減當下 bearing，方向相對地圖固定
           } else if (scooter3d) scooter3d.setLngLat([pos[1], pos[0]]);
-          if (now - (followCam3D._t || 0) > 450) { followCam3D._t = now; followCam3D(pos, hdg); }
+          if (now - (followCam3D._t || 0) > 800) {
+            let nearEdge = true;
+            try {
+              const pt = map3d.project([pos[1], pos[0]]);
+              const rc = map3d.getContainer().getBoundingClientRect();
+              const m = 90;
+              nearEdge = pt.x < m || pt.y < m || pt.x > rc.width - m || pt.y > rc.height - m;
+            } catch (e) { /* 投影失敗則跟隨，避免跟丟 */ }
+            if (nearEdge) { followCam3D._t = now; followCam3D(pos, hdg); }
+            else followCam3D._t = now;
+          }
         }
-        if (isFollowOn() && !map.getBounds().pad(-0.15).contains(pos) && !is3D) map.panTo(pos, { animate: true });
+        // 2D 跟隨：機車移動時不置中，快離開螢幕視野時才最小幅度平移（不置中）
+        if (isFollowOn() && !is3D) {
+          const ll = L.latLng(pos[0], pos[1]);
+          if (!map.getBounds().pad(-0.12).contains(ll)) map.panInside(ll, { padding: [70, 70], animate: true });
+        }
         if (k < 1) { tour.raf = requestAnimationFrame(step); return; }
         tour.raf = null;
         tour.arrived = true;
@@ -1874,26 +1910,45 @@
       };
       tour.raf = requestAnimationFrame(step);
     }
-    function clearTourTimer() { if (tour.timer) { clearInterval(tour.timer); tour.timer = null; } }
+    function clearTourTimer() { if (tour.timer) { clearInterval(tour.timer); clearTimeout(tour.timer); tour.timer = null; } }
+    function tourAdvance() {
+      const list = tourStops();
+      if (tour.idx >= list.length - 1) {
+        if (document.getElementById('loopChk') && document.getElementById('loopChk').checked) showTourStop(0);
+        else { tour.finished = true; pauseTour(); return; }
+      } else showTourStop(tour.idx + 1);
+    }
     function startTour() {
       if (!map) return;
       if (!scooterMarker) buildTourRoute();
-      if (tour.finished) { tour.idx = 0; tour.finished = false; } // 播完後再按播放：從頭開始
       tour.playing = true;
       updatePlayBtn();
-      showTourStop(tour.idx, { instant: false });
-      restartTourTimer();
+      if (tour.finished) {
+        // 播完後再按播放：回到第一站並直接跳資訊卡，不需要等待時間
+        tour.finished = false;
+        showTourStop(0, { instant: true });
+        restartTourTimer(dwellMs());
+        return;
+      }
+      const immediate = showTourStop(tour.idx, { instant: false });
+      restartTourTimer(immediate ? dwellMs() : undefined);
     }
-    function restartTourTimer() {
+    function restartTourTimer(firstDelayMs) {
       clearTourTimer();
       if (!tour.playing) return;
-      tour.timer = setInterval(() => {
-        const list = tourStops();
-        if (tour.idx >= list.length - 1) {
-          if (document.getElementById('loopChk') && document.getElementById('loopChk').checked) showTourStop(0);
-          else { tour.finished = true; pauseTour(); return; }
-        } else showTourStop(tour.idx + 1);
-      }, legIntervalMs());
+      const leg = legIntervalMs();
+      const first = (firstDelayMs !== undefined && firstDelayMs !== null) ? firstDelayMs : leg;
+      if (first >= leg - 1) {
+        tour.timer = setInterval(tourAdvance, leg);
+      } else {
+        // 第一站已直接顯示資訊卡：下一站只需等停留時間，不需再等一次行進時間
+        tour.timer = setTimeout(() => {
+          if (!tour.playing) return;
+          tourAdvance();
+          if (!tour.playing) return;
+          tour.timer = setInterval(tourAdvance, legIntervalMs());
+        }, Math.max(0, first));
+      }
     }
     function pauseTour() { tour.playing = false; ++tour.animId; clearTourTimer(); if (tour.raf) { cancelAnimationFrame(tour.raf); tour.raf = null; } updatePlayBtn(); }
     function togglePlay() { tour.playing ? pauseTour() : startTour(); }
@@ -1906,18 +1961,20 @@
       const wasPlaying = tour.playing;
       pauseTour();
       showTourStop(tour.idx + d, { instant: true });
-      if (wasPlaying) startTour();
+      // 手動跳站已直接顯示資訊卡：續播時只需等停留時間，不重跑一次
+      if (wasPlaying) { tour.playing = true; updatePlayBtn(); restartTourTimer(dwellMs()); }
     }
     function seekTour(n) {
       const wasPlaying = tour.playing;
       pauseTour();
       showTourStop(n - 1, { instant: true });
-      if (wasPlaying) startTour();
+      if (wasPlaying) { tour.playing = true; updatePlayBtn(); restartTourTimer(dwellMs()); }
     }
     function setTourSpeed(s) {
       tour.speed = s;
       document.querySelectorAll('#speedGroup .pbtn').forEach(b => b.classList.toggle('on', parseFloat(b.dataset.speed) === s));
-      if (tour.playing) startTour(); // 以新速度重啟節拍
+      // 調速不重跑當前腿：只重啟節拍，行進中動畫跑完後續腿自動用新速度
+      if (tour.playing) restartTourTimer(tour.arrived ? dwellMs() : undefined);
     }
 
     const _tourInitMap = initMap;
