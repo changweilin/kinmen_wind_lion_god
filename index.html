@@ -1711,7 +1711,7 @@
           if (threeOK && threeScene) {
             const sc = ensureThreeScoot();
             sc.lng = pos[1]; sc.lat = pos[0];
-            sc.rel = hdg - map3d.getBearing(); // 螢幕上向對應的相對方位
+            sc.hdg = hdg; // 存地理方位，渲染時減當下 bearing，方向相對地圖固定
           } else if (scooter3d) scooter3d.setLngLat([pos[1], pos[0]]);
           if (now - (followCam3D._t || 0) > 450) { followCam3D._t = now; followCam3D(pos, hdg); }
         }
@@ -1792,8 +1792,9 @@
       const btn = document.getElementById('modeToggle');
       if (btn) btn.title = is3D ? '切換回 2D 平面圖' : '切換 3D 地形圖';
       if (is3D && !map3d) initMap3D();
+      if (is3D && map3d && map3dReady) setTimeout(() => { try { map3d.resize(); sizeThreeOverlay(); } catch (e) {} }, 60);
       if (is3D && map3dReady) {
-        if (threeOK && !threeR) initThreeOverlay();
+        if (!threeR) initThreeOverlayAsync().then(() => { renderMarkers3D(); syncScooter3DToCurrent(false); });
         if (typeof camSmooth !== 'undefined') camSmooth.b = null; // 切換模式重置平滑狀態
         renderMarkers3D();
         syncScooter3DToCurrent(true);
@@ -1811,13 +1812,16 @@
         sources: {
           'esri-sat': { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 19, attribution: '© Esri World Imagery' },
           'esri-ref': { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 19 },
-          'terrain-dem': { type: 'raster-dem', url: 'https://demotiles.maplibre.org/terrain-tiles/tiles.json', tileSize: 256, maxzoom: 15 }
+          // 全球 DEM（Terrarium 編碼，覆蓋金門；原 demotiles 僅 maxzoom 12 且可能缺本地資料）
+          'terrain-dem': { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 15, encoding: 'terrarium', attribution: '© Mapzen / AWS Terrain Tiles' }
         },
         layers: [
           { id: 'sat', type: 'raster', source: 'esri-sat' },
+          // 山體陰影：讓低緩丘陵起伏在衛星圖上看得出來
+          { id: 'hill', type: 'hillshade', source: 'terrain-dem', paint: { 'hillshade-exaggeration': 0.45, 'hillshade-shadow-color': '#3d2f1e', 'hillshade-highlight-color': '#ffffff' } },
           { id: 'ref', type: 'raster', source: 'esri-ref' }
         ],
-        terrain: { source: 'terrain-dem', exaggeration: 1.5 },
+        terrain: { source: 'terrain-dem', exaggeration: 2.0 },
         sky: { 'sky-color': '#7db8ff', 'horizon-color': '#ffffff', 'fog-color': '#dfe9f5', 'fog-ground-blend': 0.6, 'horizon-fog-blend': 0.5, 'sky-horizon-blend': 0.4 }
       };
     }
@@ -1828,10 +1832,11 @@
       map3d.on('load', () => {
         map3dReady = true;
         ensureTrail3D();
-        initThreeOverlay();
-        renderMarkers3D();
-        syncScooter3DToCurrent(true);
-        drawTrailStatic3D();
+        initThreeOverlayAsync().then(() => {
+          renderMarkers3D();
+          syncScooter3DToCurrent(true);
+          drawTrailStatic3D();
+        });
       });
     }
     // CSS 備援標記（THREE 載入失敗時使用）：底座＋獅子 emoji＋站號，底座色沿用 2D 彩虹色
@@ -1881,6 +1886,48 @@
     // 透明疊加層＋單一透視相機（螢幕空間），每幀以 map3d.project 對齊經緯度；
     // 站色沿用 getRainbowColor（顏色不變）；THREE 載入失敗自動退回 CSS 版標記。
     let threeOK = (typeof THREE !== 'undefined');
+    // three.js 載入鏈強固化：主 CDN 失敗改用 unpkg；初始化狀態可觀測（window.__diag）
+    function loadThreeLib() {
+      if (typeof THREE !== 'undefined') return Promise.resolve(true);
+      return new Promise(resolve => {
+        const s = document.createElement('script');
+        s.src = 'https://unpkg.com/three@0.149.0/build/three.min.js';
+        s.onload = () => resolve(typeof THREE !== 'undefined');
+        s.onerror = () => resolve(false);
+        document.head.appendChild(s);
+      });
+    }
+    async function initThreeOverlayAsync() {
+      if (threeR) { markThreeStatus(); return true; }
+      if (typeof THREE === 'undefined') threeOK = await loadThreeLib();
+      if (!threeOK) { markThreeStatus(); return false; }
+      const ok = initThreeOverlay();
+      markThreeStatus();
+      return ok;
+    }
+    function markThreeStatus() {
+      const good = threeOK && !!threeScene;
+      const btn = document.getElementById('modeToggle');
+      if (btn) btn.title = good ? '3D地形圖・three.js 立體指示物' : '3D地形圖・備援平面指示物（three.js 載入失敗）';
+      window.__markerMode = good ? 'three' : 'css-fallback';
+      if (!good) toastThreeFallback();
+    }
+    let toastShown3 = false;
+    function toastThreeFallback() {
+      if (toastShown3) return; toastShown3 = true;
+      const d = document.createElement('div');
+      d.textContent = '⚠ three.js 載入失敗，3D 指示物改用平面圖示（導覽不受影響）';
+      d.style.cssText = 'position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:700;background:#b45309;color:#fff;padding:8px 14px;border-radius:8px;font-size:0.8rem;box-shadow:0 2px 8px rgba(0,0,0,0.3);';
+      document.getElementById('map').appendChild(d);
+      setTimeout(() => { try { d.remove(); } catch (e) {} }, 6000);
+    }
+    window.__diag = () => ({
+      threeLib: typeof THREE !== 'undefined', threeOK, hasRenderer: !!threeR,
+      lions: (typeof threeLions !== 'undefined') ? threeLions.size : -1,
+      bearing: (typeof map3d !== 'undefined' && map3d) ? map3d.getBearing() : null,
+      overlay: (typeof threeOverlay !== 'undefined' && threeOverlay) ? [threeOverlay._w, threeOverlay._h] : null,
+      markerMode: window.__markerMode || '?'
+    });
     let threeR = null, threeScene = null, threeCam = null, threeOverlay = null, threeStarted = false, threeRay = null;
     let threeLions = new Map(), threeScoot = null;
     const THREE_PX = { lion: 68, scoot: 80 };
@@ -2074,6 +2121,7 @@
     function rebuildThreeLions() {
       threeLions.forEach(o => threeScene.remove(o.group));
       threeLions = new Map();
+      loadFaceStore();
       tourStops().filter(s => s.lat && s.lng && (currentFilter === 'ALL' || s.date === currentFilter))
         .forEach(stop => {
           const grp = buildStoneLion(getRainbowColor(stop.stop_id));
@@ -2081,14 +2129,82 @@
           badge.position.y = 2.45; grp.add(badge);
           grp.traverse(o => { o.userData.stopId = stop.stop_id; });
           threeScene.add(grp);
-          threeLions.set(stop.stop_id, { group: grp, stop: stop, phase: (stop.stop_id * 1.37) % 6.28, h: grp.userData.h });
+          threeLions.set(stop.stop_id, {
+            group: grp, stop: stop,
+            face: lionFaceDeg[stop.stop_id] !== undefined ? lionFaceDeg[stop.stop_id] : 180,
+            phase: (stop.stop_id * 1.37) % 6.28,
+            h: grp.userData.h
+          });
         });
+      detectLionFacings(); // 背景偵測附近建築／道路，算出面向後即時更新
+    }
+    // 風獅爺面向：背對 200m 內最近建築（面向＝建築→站點方位）；
+    // 附近無建築則面向 150m 內最近道路（面向＝站點→道路方位）；都沒有才面南
+    const lionFaceDeg = {};
+    const FACE_STORE_KEY = 'wls_lion_face_v2';
+    function loadFaceStore() {
+      try { Object.assign(lionFaceDeg, JSON.parse(localStorage.getItem(FACE_STORE_KEY) || '{}')); } catch (e) {}
+    }
+    function saveFaceStore() {
+      try { localStorage.setItem(FACE_STORE_KEY, JSON.stringify(lionFaceDeg)); } catch (e) {}
+    }
+    async function overpassPOST(q) {
+      const res = await fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'data=' + encodeURIComponent(q)
+      });
+      if (!res.ok) throw new Error('overpass ' + res.status);
+      return res.json();
+    }
+    let faceFetching = false;
+    async function detectLionFacings() {
+      if (faceFetching || !threeOK) return;
+      faceFetching = true;
+      loadFaceStore();
+      const stops = tourStops().filter(s => s.lat && s.lng && lionFaceDeg[s.stop_id] === undefined);
+      for (const st of stops) {
+        let face;
+        try {
+          const q = `[out:json][timeout:25];(node["building"](around:200,${st.lat},${st.lng});way["building"](around:200,${st.lat},${st.lng}););out center 30;`;
+          const j = await overpassPOST(q);
+          let best = null, bestD = Infinity;
+          (j.elements || []).forEach(e => {
+            const c = e.center || e;
+            const clng = c.lon !== undefined ? c.lon : c.lng;
+            if (c.lat === undefined || clng === undefined) return;
+            const d = haversineM(st.lat, st.lng, c.lat, clng);
+            if (d < bestD) { bestD = d; best = { lat: c.lat, lng: clng }; }
+          });
+          if (best) face = Math.round(bearingBetween([best.lat, best.lng], [st.lat, st.lng]));
+        } catch (e) { console.warn('建築偵測略過', st.stop_number, e); }
+        if (face === undefined) {
+          try {
+            const rq = `[out:json][timeout:25];(way["highway"](around:150,${st.lat},${st.lng}););out geom 40;`;
+            const rj = await overpassPOST(rq);
+            let bp = null, bd = Infinity;
+            (rj.elements || []).forEach(e => {
+              (e.geometry || []).forEach(gp => {
+                if (gp.lat === undefined || gp.lon === undefined) return;
+                const d = haversineM(st.lat, st.lng, gp.lat, gp.lon);
+                if (d < bd) { bd = d; bp = gp; }
+              });
+            });
+            face = bp ? Math.round(bearingBetween([st.lat, st.lng], [bp.lat, bp.lon])) : 180;
+          } catch (e2) { console.warn('道路偵測略過', st.stop_number, e2); face = 180; }
+        }
+        lionFaceDeg[st.stop_id] = face;
+        const o = threeLions.get(st.stop_id);
+        if (o) o.face = face;
+        saveFaceStore();
+        await new Promise(r => setTimeout(r, 400));
+      }
+      faceFetching = false;
     }
     function ensureThreeScoot() {
       if (!threeScoot) {
         const grp = buildScooter3D();
         threeScene.add(grp);
-        threeScoot = { group: grp, h: grp.userData.h, lng: 118.375, lat: 24.448, rel: 90, yaw: 0, wheels: grp.userData.wheels };
+        threeScoot = { group: grp, h: grp.userData.h, lng: 118.375, lat: 24.448, hdg: 90, yaw: 0, wheels: grp.userData.wheels };
       }
       return threeScoot;
     }
@@ -2111,15 +2227,17 @@
       requestAnimationFrame(threeTick);
       if (!is3D || !map3dReady || !threeOK || !threeR || !threeOverlay || !threeOverlay._w) return;
       const w = threeOverlay._w, h = threeOverlay._h, cx = w / 2, cy = h / 2;
-      const zoom = map3d.getZoom(), t = performance.now() / 1000, m = 60;
+      const zoom = map3d.getZoom(), mapB = map3d.getBearing(), t = performance.now() / 1000, m = 60;
       threeLions.forEach(o => {
         const p = map3d.project([o.stop.lng, o.stop.lat]);
         if (p.x < -m || p.y < -m || p.x > w + m || p.y > h + m) { o.group.visible = false; return; }
         o.group.visible = true;
         const r = threeScaleFor(THREE_PX.lion, o.h, zoom);
-        o.group.scale.setScalar(r.s);
-        o.group.position.set((p.x - cx) * r.wpp, (cy - p.y) * r.wpp, p.y * 0.0004);
-        o.group.rotation.set(0, Math.sin(t * 0.5 + o.phase) * 0.45, 0);
+        // 不轉動：呼吸（縮放＋浮動）代替自轉；面向相對地圖固定，地圖旋轉時跟著轉
+        const br = Math.sin(t * 2 + o.phase);
+        o.group.scale.setScalar(r.s * (1 + 0.018 * br));
+        o.group.position.set((p.x - cx) * r.wpp, (cy - p.y) * r.wpp + br * r.s * 0.03, p.y * 0.0004);
+        o.group.rotation.set(0, Math.PI - THREE.MathUtils.degToRad((o.face === undefined ? 180 : o.face) - mapB), 0);
       });
       if (threeScoot) {
         const sc = threeScoot;
@@ -2130,7 +2248,9 @@
           const r = threeScaleFor(THREE_PX.scoot, sc.h, zoom);
           sc.group.scale.setScalar(r.s);
           sc.group.position.set((p.x - cx) * r.wpp, (cy - p.y) * r.wpp, 1);
-          const target = THREE.MathUtils.degToRad(90 - (((sc.rel % 360) + 360) % 360));
+          // 機車朝向＝地理行進方位，相對地圖固定（地圖旋轉時跟著轉）
+          const mapRel = (((sc.hdg - mapB) % 360) + 360) % 360;
+          const target = THREE.MathUtils.degToRad(90 - mapRel);
           let d = target - sc.yaw;
           while (d > Math.PI) d -= Math.PI * 2;
           while (d < -Math.PI) d += Math.PI * 2;
