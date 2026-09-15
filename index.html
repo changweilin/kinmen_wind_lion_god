@@ -1506,7 +1506,8 @@
     function travelMs() { return TRAVEL_MS * (typeof is3D !== 'undefined' && is3D ? TEMPO3D : 1) / tour.speed; }
     function dwellMs() { return DWELL_MS * (typeof is3D !== 'undefined' && is3D ? TEMPO3D : 1) / tour.speed; }
     function legIntervalMs() { return (TRAVEL_MS + DWELL_MS) * (typeof is3D !== 'undefined' && is3D ? TEMPO3D : 1) / tour.speed; }
-    const TRAIL_OPACITY = [0.95, 0.5, 0.22]; // 當前腿 t、t-1、t-2 漸近淡出；t-3 以前不顯示
+    const TRAIL_OPACITY = [0.95, 0.95, 0.95]; // t、t-1、t-2 不淡出；t-2 以尾巴縮短代替淡出，t-3 以前不顯示
+    const TRAIL_OPACITY_3D = [0.95, 0.95, 0.95]; // 3D：t、t-1、t-2 全飽和漸層，t-2 以尾巴縮短代替淡出
     const TRAIL_POPUP_TIP = 42; // 照片卡尖端高出站點旗標錨點的像素（旗標高32px＋10px空隙；獨立 popup offset）
     let trailStatic = null, trailLive = null, scooterMarker = null, tourPopup = null;
     // 鏡頭縮放飛行中：凍結 live 軌跡逐幀重建，讓既有向量隨地圖 CSS 縮放一起走，落地再補畫（避免重建打架造成軌跡不跟縮放）
@@ -1609,7 +1610,6 @@
           pts[pts.length - 1] = [stopB.lat, stopB.lng];
           legGeomCache.set(key, pts);
           saveLegStore();
-          refreshTrailIfVisible(stopA, stopB);
           return pts;
         } catch (e) {
           console.warn('導航軌跡取得失敗，改用直線', stopA.stop_number, stopB.stop_number, e);
@@ -1627,13 +1627,6 @@
       const p = fetchLegGeom(stopA, stopB);
       const r = timeoutMs ? await Promise.race([p, new Promise(res => setTimeout(() => res(null), timeoutMs))]) : await p;
       return r || straightPath(stopA, stopB);
-    }
-    // 該腿道路線後到、且正在顯示窗內時，重繪靜態軌跡讓道路線即時出現
-    function refreshTrailIfVisible(stopA, stopB) {
-      if (!trailStatic) return;
-      const list = tourStops();
-      const ia = list.indexOf(stopA), ib = list.indexOf(stopB);
-      if (ib === ia + 1 && ia >= tour.idx - 3 && ia <= tour.idx - 1) drawTrailStatic(tour.idx, tour.arrived);
     }
     // 背景預取全部 29 腿道路軌跡（錯開請求避免限流），播放時直接走道路
     function prefetchAllLegs() {
@@ -1754,28 +1747,32 @@
       return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * t, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * t];
     }
     // 沿路徑畫漸進色：每段道路按弧長比例在起迄站色之間取色；frac<1 只畫前段（生長效果）
-    function drawGradientPath(group, pts, cA, cB, frac, opacity) {
+    // 範圍版：只畫弧長比例 [f0, f1] 區間（t-2 尾巴隨 t 進度縮短用 [k, 1]）
+    function drawGradientPathRange(group, pts, cA, cB, f0, f1, opacity) {
       if (!pts || pts.length < 2) return;
+      f0 = Math.max(0, Math.min(1, f0)); f1 = Math.max(0, Math.min(1, f1));
+      if (f1 <= f0) return;
       const cum = pathLengths(pts), total = cum[cum.length - 1];
-      const f = Math.max(0.0001, Math.min(1, frac));
       for (let i = 1; i < pts.length; i++) {
-        const t0 = total ? cum[i - 1] / total : 0, t1 = total ? cum[i] / total : 1;
-        if (t0 >= f) break;
-        const tt = Math.min(t1, f), tm = (t0 + tt) / 2;
-        let seg = [pts[i - 1], pts[i]];
-        if (tt < t1) {
-          const u = (tt - t0) / ((t1 - t0) || 1);
-          seg = [pts[i - 1], [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * u, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * u]];
-        }
-        L.polyline(seg, { color: hslStr(lerpHSL(cA, cB, tm)), weight: 5, opacity, interactive: false }).addTo(group);
+        const s0 = total ? cum[i - 1] / total : 0, s1 = total ? cum[i] / total : 1;
+        if (s1 <= f0 || s0 >= f1) continue;
+        const a = Math.max(s0, f0), b = Math.min(s1, f1);
+        const span = (s1 - s0) || 1;
+        const pa = [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * ((a - s0) / span), pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * ((a - s0) / span)];
+        const pb = [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * ((b - s0) / span), pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * ((b - s0) / span)];
+        L.polyline([pa, pb], { color: hslStr(lerpHSL(cA, cB, (a + b) / 2)), weight: 5, opacity, interactive: false }).addTo(group);
       }
+    }
+    function drawGradientPath(group, pts, cA, cB, frac, opacity) {
+      drawGradientPathRange(group, pts, cA, cB, 0, Math.max(0.0001, frac), opacity);
     }
     function drawStopLeg(group, stopA, stopB, frac, opacity) {
       if (!stopA || !stopB || !stopA.lat || !stopB.lat) return;
       drawGradientPath(group, legPathSync(stopA, stopB),
         rainbowHSL(stopA.stop_id), rainbowHSL(stopB.stop_id), frac, opacity);
     }
-    // 重繪靜態軌跡：只留 [idx-1, idx-2, idx-3] 三腿（t、t-1、t-2），t-3 以前不顯示
+    // 重繪靜態軌跡：抵達時留 [idx-1, idx-2, idx-3] 三腿全亮；行進間只留 t-1，
+    // t 由 live 生長、t-2 尾巴由 live 隨 t 進度縮短（t-3 以前不顯示）
     // 2D/3D 嚴格隔離：只重繪當前模式，避免播放時另一地圖殘影錯亂
     function drawTrailStatic(idx, includeCurrent) {
       const in3D = (typeof is3D !== 'undefined' && is3D);
@@ -1783,9 +1780,11 @@
         if (!trailStatic) return;
         trailStatic.clearLayers();
         const list = tourStops();
-        const legs = includeCurrent ? [idx - 1, idx - 2, idx - 3] : [idx - 2, idx - 3];
+        const legs = includeCurrent ? [idx - 1, idx - 2, idx - 3] : [idx - 2];
         legs.forEach((j, rank) => {
-          if (j >= 0 && list[j] && list[j + 1]) drawStopLeg(trailStatic, list[j], list[j + 1], 1, TRAIL_OPACITY[rank]);
+          // 行進間 legs[0] 即 t-1，對齊抵達時的透明度 rank（rank+1），避免抵達瞬間閃爍
+          const opIdx = includeCurrent ? rank : rank + 1;
+          if (j >= 0 && list[j] && list[j + 1]) drawStopLeg(trailStatic, list[j], list[j + 1], 1, TRAIL_OPACITY[opIdx]);
         });
       }
       if (in3D && typeof map3dReady !== 'undefined' && map3dReady) drawTrailStatic3D(includeCurrent);
@@ -1818,9 +1817,8 @@
         else { try { map.removeLayer(trailStatic); } catch (e) {} try { map.removeLayer(trailLive); } catch (e) {} }
       }
       if (typeof map3dReady !== 'undefined' && map3dReady && map3d.getLayer('tour-trail-line')) {
-        ['tour-trail-casing', 'tour-trail-line', 'tour-live-casing', 'tour-live-line'].forEach(id => {
-          try { if (map3d.getLayer(id)) map3d.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none'); } catch (e) {}
-        });
+        map3d.setLayoutProperty('tour-trail-line', 'visibility', on ? 'visible' : 'none');
+        map3d.setLayoutProperty('tour-live-line', 'visibility', on ? 'visible' : 'none');
       }
     }
     // 照片資訊卡牌：主照片在上、副照片在下；無副照片時整個照片區都給主照片
@@ -2008,7 +2006,7 @@
           if (ov3 && map3dReady) overviewCam3D(fromStop, stop);
           ensureLegGeom(fromStop, stop, 2000).then((path) => {
             if (myReq !== tour.reqSeq) return;
-            animateScooter(path, cA, cB, travelMs(), stop, false, ov3, fromStop);
+            animateScooter(path, cA, cB, travelMs(), stop, false, ov3);
           });
           return false;
         }
@@ -2054,7 +2052,7 @@
           // 等導航軌跡（最多 2 秒，逾時先用直線出發；快取命中後即全程走道路）
           ensureLegGeom(fromStop, stop, 2000).then((path) => {
             if (myReq !== tour.reqSeq) return;
-            animateScooter(path, cA, cB, travelMs(), stop, flip, ov2, fromStop);
+            animateScooter(path, cA, cB, travelMs(), stop, flip, ov2);
           });
           return false;
         }
@@ -2062,48 +2060,49 @@
     }
     // 機車沿導航路徑以弧長勻速推進：每條腿固定 TRAVEL_MS（與距離無關），逐幀更新位置＋漸進色生長；資訊卡固定在站點旗標上不跟車
     // 2D/3D 嚴格隔離：各只更新當前模式的圖層
-    function animateScooter(pathPts, cA, cB, durMs, stopB, flip, overview, fromStop) {
+    function animateScooter(pathPts, cA, cB, durMs, stopB, flip, overview) {
       if (tour.raf) { cancelAnimationFrame(tour.raf); tour.raf = null; }
       const in3Dstart = (typeof is3D !== 'undefined' && is3D);
       if (!in3Dstart && !scooterMarker) return;
       const myAnim = ++tour.animId;
       if (!in3Dstart && scooterMarker) scooterMarker.setIcon(scooterIcon(stopB, flip));
       // 行進間不碰資訊卡：卡片繼續留在原站點旗標上方，抵達才換新站內容
-      // 出發時可能是直線（OSRM 逾時 fallback）；道路線晚到即中途換路，機車＋軌跡一起貼回道路
-      let pts = pathPts;
-      let cum = pathLengths(pts), total = cum[cum.length - 1] || 0;
-      const legA = fromStop, legB = stopB;
+      // 單腿路徑開跑即鎖定（道路／直線二選一），整腿不再改變，避免走到一半變線
+      const cum = pathLengths(pathPts), total = cum[cum.length - 1] || 0;
+      // t-2 尾巴幾何開跑即快照鎖定：行進中不再重查快取，否則 OSRM 晚到會讓尾巴中途變線
+      const tlist = tourStops(); // 同腿內 idx 不變
+      const _ta = tlist[tour.idx - 3], _tb = tlist[tour.idx - 2];
+      const _hasTail = _ta && _tb && _ta.lat != null && _tb.lat != null;
+      const _tailPts = _hasTail ? legPathSync(_ta, _tb) : null;
+      const tailSnap = (_tailPts && _tailPts.length > 1)
+        ? { pts: _tailPts, cA: rainbowHSL(_ta.stop_id), cB: rainbowHSL(_tb.stop_id) } : null;
       const t0 = performance.now();
-      let lastDraw = 0, lastUpgrade = 0, didZoomIn = false;
+      let lastDraw = 0, didZoomIn = false;
       const step = (now) => {
         if (myAnim !== tour.animId) return; // 已被更新的導覽請求取代
         const cur3D = (typeof is3D !== 'undefined' && is3D);
         // 模式中途切換：停掉舊模式動畫，避免 2D/3D 互相覆寫
         if (cur3D !== in3Dstart) { tour.raf = null; return; }
-        if (now - lastUpgrade > 400 && legA && legB && legA !== legB) {
-          lastUpgrade = now;
-          try {
-            const better = legGeomCache.get(legKey(legA, legB));
-            if (better && better !== pts) { pts = better; cum = pathLengths(pts); total = cum[cum.length - 1] || 0; }
-          } catch (e) {}
-        }
         const k = Math.min(1, (now - t0) / durMs);
-        const pos = total ? pointAtPath(pts, cum, total, k) : pts[0];
+        const pos = total ? pointAtPath(pathPts, cum, total, k) : pathPts[0];
         if (!cur3D && scooterMarker) scooterMarker.setLatLng(pos);
         // 縮放飛行中跳過重建（向量隨地圖一起縮放）；超過 600ms 沒畫則補一次，避免卡住
         if (!cur3D && trailLive && (now - lastDraw > 90) && (!camFlying || now - lastDraw > 600)) {
           lastDraw = now;
           trailLive.clearLayers();
-          drawGradientPath(trailLive, pts, cA, cB, k, TRAIL_OPACITY[0]);
+          // t-2 尾巴：不透明，隨 t 進度從尾端縮短（[k, 1]，與 t-1 同透明度銜接）
+          if (tailSnap) drawGradientPathRange(trailLive, tailSnap.pts, tailSnap.cA, tailSnap.cB, k, 1, TRAIL_OPACITY[1]);
+          // t 只隨機車生長出現，抵達才完整（不預畫整腿，避免還沒到就先出現並蓋掉重疊舊腿）
+          drawGradientPath(trailLive, pathPts, cA, cB, k, TRAIL_OPACITY[0]);
         }
         if (cur3D && now - lastDraw > 90) {
           lastDraw = now;
-          if (typeof map3dReady !== 'undefined' && map3dReady) drawLive3D(pts, k, hslStr(cB));
+          if (typeof map3dReady !== 'undefined' && map3dReady) drawLive3D(pathPts, k, cA, cB, tailSnap);
         }
         // 3D 機車位置每幀必更新（跟隨開關／全景腿只影響鏡頭，不影響機車本身，避免機車凍結或飛出視野消失）
         // 短腿維持原邏輯，只在機車快離開螢幕視野時才跟著移動；長距離全景腿由 overview/zoomIn 接管鏡頭
         if (typeof map3dReady !== 'undefined' && map3dReady && is3D && total) {
-          const ahead = pointAtPath(pts, cum, total, Math.min(1, k + 0.02));
+          const ahead = pointAtPath(pathPts, cum, total, Math.min(1, k + 0.02));
           const hdg = bearingBetween([pos[0], pos[1]], [ahead[0], ahead[1]]);
           if (threeOK && threeScene) {
             const sc = ensureThreeScoot();
@@ -2774,52 +2773,75 @@
       });
     }
     function ensureTrail3D() {
-      if (!map3dReady || map3d.getSource('tour-trail')) return;
-      map3d.addSource('tour-trail', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-      // 深色描邊墊底（與 2D 軌跡同資料源）：衛星圖上舊腿才看得見 t~t-2
-      map3d.addLayer({ id: 'tour-trail-casing', type: 'line', source: 'tour-trail', paint: { 'line-color': '#1c1917', 'line-opacity': ['get', 'opacity'], 'line-width': 9 } });
-      map3d.addLayer({ id: 'tour-trail-line', type: 'line', source: 'tour-trail', paint: { 'line-color': ['get', 'color'], 'line-opacity': ['get', 'opacity'], 'line-width': 5, 'line-emissive-strength': 0.4 } });
-      map3d.addSource('tour-live', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-      map3d.addLayer({ id: 'tour-live-casing', type: 'line', source: 'tour-live', paint: { 'line-color': '#1c1917', 'line-opacity': 0.9, 'line-width': 10 } });
-      map3d.addLayer({ id: 'tour-live-line', type: 'line', source: 'tour-live', paint: { 'line-color': ['get', 'color'], 'line-opacity': 0.95, 'line-width': 6 } });
+      if (!map3dReady) return;
+      if (!map3d.getSource('tour-trail')) map3d.addSource('tour-trail', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      // 注意：line-* paint 只能用 style-spec 既有屬性（4.7 無 line-emissive-strength，加了會讓整層不渲染）
+      if (!map3d.getLayer('tour-trail-line')) map3d.addLayer({ id: 'tour-trail-line', type: 'line', source: 'tour-trail', paint: { 'line-color': ['get', 'color'], 'line-opacity': ['get', 'opacity'], 'line-width': 6 } });
+      if (!map3d.getSource('tour-live')) map3d.addSource('tour-live', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      if (!map3d.getLayer('tour-live-line')) map3d.addLayer({ id: 'tour-live-line', type: 'line', source: 'tour-live', paint: { 'line-color': ['get', 'color'], 'line-opacity': 0.95, 'line-width': 7 } });
     }
-    function hslToCss(stopId) { const c = rainbowHSL(stopId); return `hsl(${Math.round(c.h)},${Math.round(c.s)}%,${Math.round(c.l)}%)`; }
+    // 通用漸層子段：原始點串＋起迄色＋透明度＋弧長範圍 → GeoJSON features
+    function gradSegFeats(p, cA, cB, opacity, f0, f1) {
+      const feats = [];
+      if (!p || p.length < 2) return feats;
+      f0 = (f0 === undefined) ? 0 : Math.max(0, Math.min(1, f0));
+      f1 = (f1 === undefined) ? 1 : Math.max(0, Math.min(1, f1));
+      if (f1 <= f0) return feats;
+      const cum = pathLengths(p), total = cum[cum.length - 1] || 0;
+      for (let i = 1; i < p.length; i++) {
+        const s0 = total ? cum[i - 1] / total : 0, s1 = total ? cum[i] / total : 1;
+        if (s1 <= f0 || s0 >= f1) continue;
+        const a = Math.max(s0, f0), b = Math.min(s1, f1);
+        const span = (s1 - s0) || 1;
+        const ax = p[i - 1][1] + (p[i][1] - p[i - 1][1]) * ((a - s0) / span), ay = p[i - 1][0] + (p[i][0] - p[i - 1][0]) * ((a - s0) / span);
+        const bx = p[i - 1][1] + (p[i][1] - p[i - 1][1]) * ((b - s0) / span), by = p[i - 1][0] + (p[i][0] - p[i - 1][0]) * ((b - s0) / span);
+        feats.push({ type: 'Feature', properties: { color: hslStr(lerpHSL(cA, cB, (a + b) / 2)), opacity }, geometry: { type: 'LineString', coordinates: [[ax, ay], [bx, by]] } });
+      }
+      return feats;
+    }
+    function legGradientFeats3D(stopA, stopB, opacity, f0, f1) {
+      if (!stopA || !stopB || stopA.lat == null || stopB.lat == null) return [];
+      let p = legPathSync(stopA, stopB);
+      if (!p || p.length < 2) return [];
+      if (p.length > 48) p = decimatePath(p, 48);
+      return gradSegFeats(p, rainbowHSL(stopA.stop_id), rainbowHSL(stopB.stop_id), opacity, f0, f1);
+    }
+    // 靜態 t~t-2：每腿漸層色、全飽和不淡出；行進間只留 t-1（t-2 尾巴由 live 逐幀縮短）
+    function buildTrailStaticFeats3D(idx, includeCurrent) {
+      const list = tourStops();
+      const legs = includeCurrent ? [idx - 1, idx - 2, idx - 3] : [idx - 2];
+      const feats = [];
+      legs.forEach((j, rank) => {
+        if (j < 0 || !list[j] || !list[j + 1]) return;
+        const opIdx = includeCurrent ? rank : rank + 1;
+        legGradientFeats3D(list[j], list[j + 1], TRAIL_OPACITY_3D[opIdx]).forEach(f => feats.push(f));
+      });
+      return feats;
+    }
     function drawTrailStatic3D(includeCurrent) {
       if (!map3dReady) return;
       try {
         ensureTrail3D();
         if (includeCurrent === undefined) includeCurrent = tour.arrived;
-        const list = tourStops();
-        const legs = includeCurrent ? [tour.idx - 1, tour.idx - 2, tour.idx - 3] : [tour.idx - 2, tour.idx - 3];
-        const feats = [];
-        legs.forEach((j, rank) => {
-          if (j >= 0 && list[j] && list[j + 1] && list[j].lat && list[j + 1].lat) {
-            const pts = legPathSync(list[j], list[j + 1]).map(p => [p[1], p[0]]);
-            feats.push({ type: 'Feature', properties: { color: hslToCss(list[j + 1].stop_id), opacity: TRAIL_OPACITY[rank] || 0.2 }, geometry: { type: 'LineString', coordinates: pts } });
-          }
-        });
-        map3d.getSource('tour-trail').setData({ type: 'FeatureCollection', features: feats });
+        map3d.getSource('tour-trail').setData({ type: 'FeatureCollection', features: buildTrailStaticFeats3D(tour.idx, includeCurrent) });
         if (!tour.playing || tour.arrived) map3d.getSource('tour-live').setData({ type: 'FeatureCollection', features: [] });
       } catch (e) { /* 圖層尚未就緒則略過，下次重繪補上 */ }
     }
-    function drawLive3D(pathPts, frac, cBcss) {
+    // 行進間 live：漸層彩色只隨機車生長（抵達才完整）＋t-2 尾巴縮短（與 2D 對齊）
+    // tail 為開跑時快照（行進中不再重查快取，避免尾巴中途變線）
+    function drawLive3D(pathPts, frac, cA, cB, tail) {
       if (!map3dReady) return;
       ensureTrail3D();
-      const cum = pathLengths(pathPts), total = cum[cum.length - 1] || 0;
+      let p = pathPts;
+      if (!p || p.length < 2) return;
+      if (p.length > 60) p = decimatePath(p, 60);
       const f = Math.max(0.0001, Math.min(1, frac));
-      const coords = [[pathPts[0][1], pathPts[0][0]]];
-      for (let i = 1; i < pathPts.length; i++) {
-        const t1 = total ? cum[i] / total : 1;
-        if (cum[i - 1] / total >= f) break;
-        if (t1 <= f) coords.push([pathPts[i][1], pathPts[i][0]]);
-        else {
-          const t0 = total ? cum[i - 1] / total : 0;
-          const u = (f - t0) / ((t1 - t0) || 1);
-          coords.push([pathPts[i - 1][1] + (pathPts[i][1] - pathPts[i - 1][1]) * u, pathPts[i - 1][0] + (pathPts[i][0] - pathPts[i - 1][0]) * u]);
-          break;
-        }
+      const feats = gradSegFeats(p, cA, cB, 0.95, 0, f);
+      if (tail && tail.pts && tail.pts.length > 1) {
+        const tp = tail.pts.length > 48 ? decimatePath(tail.pts, 48) : tail.pts;
+        gradSegFeats(tp, tail.cA, tail.cB, TRAIL_OPACITY_3D[1], f, 1).forEach(x => feats.push(x));
       }
-      map3d.getSource('tour-live').setData({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: { color: cBcss }, geometry: { type: 'LineString', coordinates: coords } }] });
+      map3d.getSource('tour-live').setData({ type: 'FeatureCollection', features: feats });
     }
     function bearingBetween(a, b) {
       const toRad = d => d * Math.PI / 180, toDeg = r => r * 180 / Math.PI;
