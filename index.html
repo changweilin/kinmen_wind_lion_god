@@ -70,8 +70,8 @@
     #drawerClose { display: none; }
     .main-container { display: flex; flex: 1; height: calc(100vh - 52px); position: relative; }
     #map { flex: 1; height: 100%; z-index: 1; }
-    #map3d { position: absolute; inset: 0; z-index: 2; display: none; }
-    #map3d.show { display: block; z-index: 500; }
+    #map3d { position: absolute; inset: 0; z-index: 2; display: block; visibility: hidden; }
+    #map3d.show { display: block; visibility: visible; z-index: 500; }
     /* 3D 模式：隱藏底下 2D Leaflet 圖層/控制，避免雙地圖疊影錯亂；播放器保持最上層 */
     #map.is3d .leaflet-map-pane, #map.is3d .leaflet-control-container { visibility: hidden; }
     #map.is3d .leaflet-popup-pane { display: none; }
@@ -1048,30 +1048,30 @@
 
       // Google Maps 道路圖
       const googleRoads = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-        maxZoom: 20, subdomains: ['0', '1', '2', '3'], attribution: '© Google Maps'
+        maxZoom: 20, subdomains: ['0', '1', '2', '3'], attribution: '© Google Maps', keepBuffer: 8, updateWhenIdle: false
       });
       // OpenStreetMap (OSM)
       const osmStandard = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19, attribution: '© OpenStreetMap contributors'
+        maxZoom: 19, attribution: '© OpenStreetMap contributors', keepBuffer: 8, updateWhenIdle: false
       });
       // Google Maps 衛星混合圖
       const googleHybrid = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-        maxZoom: 20, subdomains: ['0', '1', '2', '3'], attribution: '© Google Maps Satellite'
+        maxZoom: 20, subdomains: ['0', '1', '2', '3'], attribution: '© Google Maps Satellite', keepBuffer: 8, updateWhenIdle: false
       });
       // 臺灣通用電子地圖 (NLSC)
       const nlscEmap = L.tileLayer('https://wmts.nlsc.gov.tw/wmts/EMAP/default/EPSG:3857/{z}/{y}/{x}', {
-        maxZoom: 20, attribution: '© 國土測繪圖資服務雲'
+        maxZoom: 20, attribution: '© 國土測繪圖資服務雲', keepBuffer: 8, updateWhenIdle: false
       });
       // CartoDB 全彩地圖
       const cartoVoyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19, subdomains: 'abcd', attribution: '© CARTO'
+        maxZoom: 19, subdomains: 'abcd', attribution: '© CARTO', keepBuffer: 8, updateWhenIdle: false
       });
       // Esri 暗灰夜卷（免 key）・知性夜航底圖：暗灰底＋注記疊加，維持地名可讀性
       const esriDarkBase = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 19, attribution: '© Esri, HERE, Garmin, OpenStreetMap contributors'
+        maxZoom: 19, attribution: '© Esri, HERE, Garmin, OpenStreetMap contributors', keepBuffer: 8, updateWhenIdle: false
       });
       const esriDarkRef = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 19
+        maxZoom: 19, keepBuffer: 8, updateWhenIdle: false
       });
       const esriDark = L.layerGroup([esriDarkBase, esriDarkRef]);
 
@@ -1109,6 +1109,11 @@
       }
 
       initMobileUI();
+
+      // 縮放動畫期間凍結 live 軌跡重建（含使用者手動縮放）；落地解除，下一幀自動補畫到最新進度
+      map.on('zoomanim', () => camFlyStart(1.2));
+      map.on('zoomend', () => { camFlying = false; if (camFlyTimer) { clearTimeout(camFlyTimer); camFlyTimer = null; } });
+      map.on('moveend', () => { if (!tour.playing) camFlying = false; });
 
       loadVisualOverrides();
       renderMarkers();
@@ -1504,6 +1509,13 @@
     const TRAIL_OPACITY = [0.95, 0.5, 0.22]; // 當前腿 t、t-1、t-2 漸近淡出；t-3 以前不顯示
     const TRAIL_POPUP_TIP = 42; // 照片卡尖端高出站點旗標錨點的像素（旗標高32px＋10px空隙；獨立 popup offset）
     let trailStatic = null, trailLive = null, scooterMarker = null, tourPopup = null;
+    // 鏡頭縮放飛行中：凍結 live 軌跡逐幀重建，讓既有向量隨地圖 CSS 縮放一起走，落地再補畫（避免重建打架造成軌跡不跟縮放）
+    let camFlying = false, camFlyTimer = null;
+    function camFlyStart(durSec) {
+      camFlying = true;
+      if (camFlyTimer) clearTimeout(camFlyTimer);
+      camFlyTimer = setTimeout(() => { camFlying = false; camFlyTimer = null; }, Math.min(4000, Math.max(900, (durSec || 1.2) * 1000 + 400)));
+    }
 
     function tourStops() { return [...stopsData].sort((a, b) => a.stop_id - b.stop_id); }
     function tourSliderSync() {
@@ -1634,6 +1646,98 @@
       });
     }
     loadLegStore();
+    // ===== 大小金門 2D/3D 預載：頁面載入即暖好圖磚＋地形＋軌跡，播放時不再重讀 =====
+    // 大金＋小金（含周邊海域，確保整島視野圖磚都在預載範圍內）
+    const KINMEN_SW = [24.374, 118.165], KINMEN_NE = [24.555, 118.475];
+    function lngLatToTile(lng, lat, z) {
+      const n = Math.pow(2, z);
+      return [Math.floor((lng + 180) / 360 * n), Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n)];
+    }
+    // 2D＋3D 全圖資預載：用 Image 背景暖瀏覽器快取（Leaflet/MapLibre 取圖同 URL 即命中），不動使用者視角
+    // 涵蓋 2D 道路＋衛星＋夜卷、3D 衛星＋注記＋DEM 地形：z11-13 全島＋z14-16 站點周邊
+    let warmed2D = false;
+    function warm2DTiles() {
+      if (warmed2D) return; warmed2D = true;
+      try {
+        const g = (x, y, z, lyrs) => `https://mt${((x + y) % 4 + 4) % 4}.google.com/vt/lyrs=${lyrs}&x=${x}&y=${y}&z=${z}`;
+        const esriBase = (x, y, z) => `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/${z}/${y}/${x}`;
+        const esriSat = (x, y, z) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+        const esriRef = (x, y, z) => `https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/${z}/${y}/${x}`;
+        const dem = (x, y, z) => `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const urls = [];
+        // 全島概覽層：圖磚少，2D/3D 六種圖資全暖
+        [11, 12, 13].forEach(z => {
+          const [x0, y0] = lngLatToTile(KINMEN_SW[1], KINMEN_NE[0], z);
+          const [x1, y1] = lngLatToTile(KINMEN_NE[1], KINMEN_SW[0], z);
+          for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++)
+            for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) {
+              urls.push(g(x, y, z, 'm'), esriSat(x, y, z), dem(x, y, z));
+              urls.push(isDark ? esriBase(x, y, z) : g(x, y, z, 'y'));
+              if ((x + y) % 2 === 0) urls.push(esriRef(x, y, z));
+            }
+        });
+        // 站點周邊細節層：當前主題＋衛星＋DEM 才暖高 zoom，避免全島高 zoom 爆量
+        const stations = tourStops().filter(s => s.lat && s.lng);
+        stations.forEach(s => {
+          const [cx14, cy14] = lngLatToTile(s.lng, s.lat, 14);
+          for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+            const x = cx14 + dx, y = cy14 + dy;
+            urls.push(g(x, y, 14, 'm'), esriSat(x, y, 14), dem(x, y, 14));
+            urls.push(isDark ? esriBase(x, y, 14) : g(x, y, 14, 'y'));
+          }
+        });
+        [15, 16].forEach(z => {
+          stations.forEach(s => {
+            const [cx, cy] = lngLatToTile(s.lng, s.lat, z);
+            const r = z === 15 ? 1 : 0;
+            for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) {
+              urls.push(g(cx + dx, cy + dy, z, 'm'), esriSat(cx + dx, cy + dy, z));
+              if (z === 15) urls.push(dem(cx + dx, cy + dy, z));
+            }
+          });
+        });
+        // 去重＋上限＋錯開載入：Image 快取命中後播放時縮放即本地快取，不再重讀
+        const seen = new Set(), queue = [];
+        for (const u of urls) { if (!seen.has(u)) { seen.add(u); queue.push(u); } }
+        queue.slice(0, 1600).forEach((u, i) => setTimeout(() => { const im = new Image(); im.referrerPolicy = 'no-referrer'; im.src = u; }, 120 + i * 18));
+      } catch (e) { console.warn('2D/3D 預載略過', e); }
+    }
+    // 3D：頁面載入即在隱藏層初始化 MapLibre（visibility:hidden 仍保有尺寸可取圖），
+    // 載入完成先 fitBounds 全島一次把衛星＋DEM＋注記都暖進快取，再跳回目前站點待命
+    let warmed3D = false;
+    function eagerInit3D() {
+      try {
+        if (typeof maplibregl === 'undefined') return;
+        if (!map3d) initMap3D();
+        if (!map3d) return;
+        const warm = () => {
+          if (warmed3D) return; warmed3D = true;
+          try {
+            ensureTrail3D();
+            map3d.fitBounds([[KINMEN_SW[1], KINMEN_SW[0]], [KINMEN_NE[1], KINMEN_NE[0]]], { duration: 0, padding: 20, pitch: 62 });
+            renderMarkers3D();
+            drawTrailStatic3D(true);
+            setTimeout(() => {
+              try {
+                const list = tourStops().filter(s => s.lat && s.lng);
+                const stop = list[Math.max(0, Math.min(tour.idx, list.length - 1))];
+                if (stop && !is3D) map3d.jumpTo({ center: [stop.lng, stop.lat], zoom: 15.5, pitch: 62 });
+              } catch (e) {}
+            }, 2500);
+          } catch (e) {}
+        };
+        if (map3dReady) setTimeout(warm, 800);
+        else map3d.once('load', () => setTimeout(warm, 800));
+      } catch (e) { console.warn('3D 預載略過', e); }
+    }
+    function preloadKinmenMaps() {
+      warm2DTiles();
+      prefetchAllLegs(); // 36 腿 OSRM 道路軌跡也一起預取
+      // 等首屏 2D 穩定後再初始化 3D，避免搶首屏頻寬
+      if ('requestIdleCallback' in window) requestIdleCallback(() => eagerInit3D(), { timeout: 4000 });
+      else setTimeout(eagerInit3D, 2500);
+    }
     // 路徑弧長工具：讓機車以固定時間勻速跑完整條道路（與距離無關）
     function pathLengths(pts) {
       const cum = [0];
@@ -1684,7 +1788,7 @@
           if (j >= 0 && list[j] && list[j + 1]) drawStopLeg(trailStatic, list[j], list[j + 1], 1, TRAIL_OPACITY[rank]);
         });
       }
-      if (in3D && typeof map3dReady !== 'undefined' && map3dReady) drawTrailStatic3D();
+      if (in3D && typeof map3dReady !== 'undefined' && map3dReady) drawTrailStatic3D(includeCurrent);
     }
     function buildTourRoute() {
       if (!map) return;
@@ -1714,8 +1818,9 @@
         else { try { map.removeLayer(trailStatic); } catch (e) {} try { map.removeLayer(trailLive); } catch (e) {} }
       }
       if (typeof map3dReady !== 'undefined' && map3dReady && map3d.getLayer('tour-trail-line')) {
-        map3d.setLayoutProperty('tour-trail-line', 'visibility', on ? 'visible' : 'none');
-        map3d.setLayoutProperty('tour-live-line', 'visibility', on ? 'visible' : 'none');
+        ['tour-trail-casing', 'tour-trail-line', 'tour-live-casing', 'tour-live-line'].forEach(id => {
+          try { if (map3d.getLayer(id)) map3d.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none'); } catch (e) {}
+        });
       }
     }
     // 照片資訊卡牌：主照片在上、副照片在下；無副照片時整個照片區都給主照片
@@ -1805,6 +1910,60 @@
       const c = document.getElementById('followChk');
       return c ? c.checked : true;
     }
+    // ===== 長距離運鏡：離開視野先拉全景、快抵達再拉近（2D/3D 共用判斷）=====
+    const LONG_LEG_M = 1800;   // 超過此直線距離視為長距離
+    const OVERVIEW_AT = 0.72;  // 行進到 72% 時拉近目的地
+    function straightDistM(a, b) {
+      if (!a || !b || a.lat == null || b.lat == null) return 0;
+      return haversineM(a.lat, a.lng, b.lat, b.lng);
+    }
+    function destOutside2D(stop) {
+      try { return map && stop && !map.getBounds().pad(-0.05).contains(L.latLng(stop.lat, stop.lng)); }
+      catch (e) { return true; }
+    }
+    function destOutside3D(stop) {
+      try {
+        if (!map3dReady || !stop) return true;
+        return !map3d.getBounds().contains([stop.lng, stop.lat]);
+      } catch (e) { return true; }
+    }
+    function shouldOverview2D(a, b) {
+      if (!isFollowOn() || !a || !b || a === b || a.lat == null || b.lat == null) return false;
+      if (straightDistM(a, b) > LONG_LEG_M) return true;
+      return destOutside2D(b);
+    }
+    function shouldOverview3D(a, b) {
+      if (!isFollowOn() || !a || !b || a === b || a.lat == null || b.lat == null) return false;
+      if (straightDistM(a, b) > LONG_LEG_M) return true;
+      return destOutside3D(b);
+    }
+    function overviewCam2D(a, b, durMs) {
+      try {
+        const bd = L.latLngBounds([[a.lat, a.lng], [b.lat, b.lng]]);
+        const dur = Math.min(1.8, Math.max(0.8, durMs / 1000 * 0.45));
+        camFlyStart(dur);
+        map.flyToBounds(bd.pad(0.22), { duration: dur });
+      } catch (e) {}
+    }
+    function zoomInCam2D(stopB, durMs) {
+      try {
+        const dur = Math.min(1.6, Math.max(0.8, durMs / 1000 * 0.3));
+        camFlyStart(dur);
+        map.flyTo([stopB.lat, stopB.lng], Math.max(map.getZoom(), 15), { duration: dur });
+      } catch (e) {}
+    }
+    function overviewCam3D(a, b) {
+      try {
+        const bb = new maplibregl.LngLatBounds([a.lng, a.lat], [a.lng, a.lat]);
+        bb.extend([b.lng, b.lat]);
+        map3d.fitBounds(bb, { padding: { top: 80, bottom: 170, left: 80, right: 80 }, pitch: 58, duration: 1400 });
+      } catch (e) {}
+    }
+    function zoomInCam3D(stopB, durMs) {
+      try {
+        map3d.easeTo({ center: [stopB.lng, stopB.lat], zoom: 16.2, pitch: 64, duration: Math.min(1600, Math.max(800, durMs * 0.3)) });
+      } catch (e) {}
+    }
     function showTourStop(i, opts = {}) {
       const list = tourStops();
       if (!list.length || !map) return;
@@ -1840,11 +1999,16 @@
             return true;
           }
           drawTrailStatic(tour.idx, false);
+          // 行進間只留舊的兩腿，當前腿由 live 逐幀生長：先清掉上一腿殘留 live（與 2D trailLive.clearLayers 對齊）
+          try { if (map3dReady && map3d.getSource('tour-live')) map3d.getSource('tour-live').setData({ type: 'FeatureCollection', features: [] }); } catch (e) {}
           const cA = fromStop ? rainbowHSL(fromStop.stop_id) : rainbowHSL(stop.stop_id);
           const cB = rainbowHSL(stop.stop_id);
+          // 長距離＋離開視野：先拉到此腿全景（等道路線時先用直線視野，出發不卡）
+          const ov3 = shouldOverview3D(fromStop, stop);
+          if (ov3 && map3dReady) overviewCam3D(fromStop, stop);
           ensureLegGeom(fromStop, stop, 2000).then((path) => {
             if (myReq !== tour.reqSeq) return;
-            animateScooter(path, cA, cB, travelMs(), stop, false);
+            animateScooter(path, cA, cB, travelMs(), stop, false, ov3, fromStop);
           });
           return false;
         }
@@ -1884,10 +2048,13 @@
           if (trailLive) trailLive.clearLayers();
           const cA = fromStop ? rainbowHSL(fromStop.stop_id) : rainbowHSL(stop.stop_id);
           const cB = rainbowHSL(stop.stop_id);
+          // 長距離＋離開視野：先拉到此腿全景，快抵達（72%）才拉近
+          const ov2 = shouldOverview2D(fromStop, stop);
+          if (ov2) overviewCam2D(fromStop, stop, travelMs());
           // 等導航軌跡（最多 2 秒，逾時先用直線出發；快取命中後即全程走道路）
           ensureLegGeom(fromStop, stop, 2000).then((path) => {
             if (myReq !== tour.reqSeq) return;
-            animateScooter(path, cA, cB, travelMs(), stop, flip);
+            animateScooter(path, cA, cB, travelMs(), stop, flip, ov2, fromStop);
           });
           return false;
         }
@@ -1895,43 +2062,55 @@
     }
     // 機車沿導航路徑以弧長勻速推進：每條腿固定 TRAVEL_MS（與距離無關），逐幀更新位置＋漸進色生長；資訊卡固定在站點旗標上不跟車
     // 2D/3D 嚴格隔離：各只更新當前模式的圖層
-    function animateScooter(pathPts, cA, cB, durMs, stopB, flip) {
+    function animateScooter(pathPts, cA, cB, durMs, stopB, flip, overview, fromStop) {
       if (tour.raf) { cancelAnimationFrame(tour.raf); tour.raf = null; }
       const in3Dstart = (typeof is3D !== 'undefined' && is3D);
       if (!in3Dstart && !scooterMarker) return;
       const myAnim = ++tour.animId;
       if (!in3Dstart && scooterMarker) scooterMarker.setIcon(scooterIcon(stopB, flip));
       // 行進間不碰資訊卡：卡片繼續留在原站點旗標上方，抵達才換新站內容
-      const cum = pathLengths(pathPts), total = cum[cum.length - 1] || 0;
+      // 出發時可能是直線（OSRM 逾時 fallback）；道路線晚到即中途換路，機車＋軌跡一起貼回道路
+      let pts = pathPts;
+      let cum = pathLengths(pts), total = cum[cum.length - 1] || 0;
+      const legA = fromStop, legB = stopB;
       const t0 = performance.now();
-      let lastDraw = 0;
+      let lastDraw = 0, lastUpgrade = 0, didZoomIn = false;
       const step = (now) => {
         if (myAnim !== tour.animId) return; // 已被更新的導覽請求取代
         const cur3D = (typeof is3D !== 'undefined' && is3D);
         // 模式中途切換：停掉舊模式動畫，避免 2D/3D 互相覆寫
         if (cur3D !== in3Dstart) { tour.raf = null; return; }
+        if (now - lastUpgrade > 400 && legA && legB && legA !== legB) {
+          lastUpgrade = now;
+          try {
+            const better = legGeomCache.get(legKey(legA, legB));
+            if (better && better !== pts) { pts = better; cum = pathLengths(pts); total = cum[cum.length - 1] || 0; }
+          } catch (e) {}
+        }
         const k = Math.min(1, (now - t0) / durMs);
-        const pos = total ? pointAtPath(pathPts, cum, total, k) : pathPts[0];
+        const pos = total ? pointAtPath(pts, cum, total, k) : pts[0];
         if (!cur3D && scooterMarker) scooterMarker.setLatLng(pos);
-        if (!cur3D && trailLive && now - lastDraw > 90) {
+        // 縮放飛行中跳過重建（向量隨地圖一起縮放）；超過 600ms 沒畫則補一次，避免卡住
+        if (!cur3D && trailLive && (now - lastDraw > 90) && (!camFlying || now - lastDraw > 600)) {
           lastDraw = now;
           trailLive.clearLayers();
-          drawGradientPath(trailLive, pathPts, cA, cB, k, TRAIL_OPACITY[0]);
+          drawGradientPath(trailLive, pts, cA, cB, k, TRAIL_OPACITY[0]);
         }
         if (cur3D && now - lastDraw > 90) {
           lastDraw = now;
-          if (typeof map3dReady !== 'undefined' && map3dReady) drawLive3D(pathPts, k, hslStr(cB));
+          if (typeof map3dReady !== 'undefined' && map3dReady) drawLive3D(pts, k, hslStr(cB));
         }
-        // 3D 跟隨運鏡：只在機車快離開螢幕視野時才跟著移動，不置中追蹤
-        if (typeof map3dReady !== 'undefined' && map3dReady && is3D && isFollowOn() && total) {
-          const ahead = pointAtPath(pathPts, cum, total, Math.min(1, k + 0.02));
+        // 3D 機車位置每幀必更新（跟隨開關／全景腿只影響鏡頭，不影響機車本身，避免機車凍結或飛出視野消失）
+        // 短腿維持原邏輯，只在機車快離開螢幕視野時才跟著移動；長距離全景腿由 overview/zoomIn 接管鏡頭
+        if (typeof map3dReady !== 'undefined' && map3dReady && is3D && total) {
+          const ahead = pointAtPath(pts, cum, total, Math.min(1, k + 0.02));
           const hdg = bearingBetween([pos[0], pos[1]], [ahead[0], ahead[1]]);
           if (threeOK && threeScene) {
             const sc = ensureThreeScoot();
             sc.lng = pos[1]; sc.lat = pos[0];
             sc.hdg = hdg; // 存地理方位，渲染時減當下 bearing，方向相對地圖固定
           } else if (scooter3d) scooter3d.setLngLat([pos[1], pos[0]]);
-          if (now - (followCam3D._t || 0) > 800) {
+          if (isFollowOn() && !overview && now - (followCam3D._t || 0) > 800) {
             let nearEdge = true;
             try {
               const pt = map3d.project([pos[1], pos[0]]);
@@ -1943,8 +2122,15 @@
             else followCam3D._t = now;
           }
         }
-        // 2D 跟隨：機車移動時不置中，快離開螢幕視野時才最小幅度平移（不置中）
-        if (isFollowOn() && !is3D) {
+        // 長距離腿：快抵達（72%）時從全景拉近目的地，抵達置中銜接
+        if (overview && !didZoomIn && k >= OVERVIEW_AT && isFollowOn()) {
+          didZoomIn = true;
+          if (!cur3D) zoomInCam2D(stopB, durMs);
+          else zoomInCam3D(stopB, durMs);
+        }
+        // 2D 跟隨：長距離全景腿由 overview/zoomIn 接管；短腿維持原邏輯，
+        // 機車移動時不置中，快離開螢幕視野時才最小幅度平移（不置中）
+        if (isFollowOn() && !is3D && !overview) {
           const ll = L.latLng(pos[0], pos[1]);
           if (!map.getBounds().pad(-0.12).contains(ll)) map.panInside(ll, { padding: [70, 70], animate: true });
         }
@@ -2034,6 +2220,7 @@
       buildTourRoute();
       tourSliderSync();
       updatePlayBtn();
+      preloadKinmenMaps();
     };
 
     // ===== 3D 地形圖（MapLibre + DEM 地形）：導覽播放共用同一 tour 狀態 =====
@@ -2065,6 +2252,7 @@
         if (typeof camSmooth !== 'undefined') camSmooth.b = null; // 切換模式重置平滑狀態
         renderMarkers3D();
         syncScooter3DToCurrent(true);
+        drawTrailStatic(tour.idx, true); // 切入 3D 即補上 t~t-2 靜態軌跡（與 2D 圖面 parity）
         const stop = tourStops()[tour.idx];
         if (stop) { openPopup3D(stop); fly3DCinematic(stop, null); }
         if (tour.playing) restartTourTimer(); // 2D/3D 節奏不同（3D 為 2 倍時長）
@@ -2588,25 +2776,31 @@
     function ensureTrail3D() {
       if (!map3dReady || map3d.getSource('tour-trail')) return;
       map3d.addSource('tour-trail', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      // 深色描邊墊底（與 2D 軌跡同資料源）：衛星圖上舊腿才看得見 t~t-2
+      map3d.addLayer({ id: 'tour-trail-casing', type: 'line', source: 'tour-trail', paint: { 'line-color': '#1c1917', 'line-opacity': ['get', 'opacity'], 'line-width': 9 } });
       map3d.addLayer({ id: 'tour-trail-line', type: 'line', source: 'tour-trail', paint: { 'line-color': ['get', 'color'], 'line-opacity': ['get', 'opacity'], 'line-width': 5, 'line-emissive-strength': 0.4 } });
       map3d.addSource('tour-live', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map3d.addLayer({ id: 'tour-live-casing', type: 'line', source: 'tour-live', paint: { 'line-color': '#1c1917', 'line-opacity': 0.9, 'line-width': 10 } });
       map3d.addLayer({ id: 'tour-live-line', type: 'line', source: 'tour-live', paint: { 'line-color': ['get', 'color'], 'line-opacity': 0.95, 'line-width': 6 } });
     }
     function hslToCss(stopId) { const c = rainbowHSL(stopId); return `hsl(${Math.round(c.h)},${Math.round(c.s)}%,${Math.round(c.l)}%)`; }
-    function drawTrailStatic3D() {
+    function drawTrailStatic3D(includeCurrent) {
       if (!map3dReady) return;
-      ensureTrail3D();
-      const list = tourStops();
-      const legs = tour.arrived ? [tour.idx - 1, tour.idx - 2, tour.idx - 3] : [tour.idx - 2, tour.idx - 3];
-      const feats = [];
-      legs.forEach((j, rank) => {
-        if (j >= 0 && list[j] && list[j + 1] && list[j].lat && list[j + 1].lat) {
-          const pts = legPathSync(list[j], list[j + 1]).map(p => [p[1], p[0]]);
-          feats.push({ type: 'Feature', properties: { color: hslToCss(list[j + 1].stop_id), opacity: TRAIL_OPACITY[rank] || 0.2 }, geometry: { type: 'LineString', coordinates: pts } });
-        }
-      });
-      map3d.getSource('tour-trail').setData({ type: 'FeatureCollection', features: feats });
-      if (!tour.playing || tour.arrived) map3d.getSource('tour-live').setData({ type: 'FeatureCollection', features: [] });
+      try {
+        ensureTrail3D();
+        if (includeCurrent === undefined) includeCurrent = tour.arrived;
+        const list = tourStops();
+        const legs = includeCurrent ? [tour.idx - 1, tour.idx - 2, tour.idx - 3] : [tour.idx - 2, tour.idx - 3];
+        const feats = [];
+        legs.forEach((j, rank) => {
+          if (j >= 0 && list[j] && list[j + 1] && list[j].lat && list[j + 1].lat) {
+            const pts = legPathSync(list[j], list[j + 1]).map(p => [p[1], p[0]]);
+            feats.push({ type: 'Feature', properties: { color: hslToCss(list[j + 1].stop_id), opacity: TRAIL_OPACITY[rank] || 0.2 }, geometry: { type: 'LineString', coordinates: pts } });
+          }
+        });
+        map3d.getSource('tour-trail').setData({ type: 'FeatureCollection', features: feats });
+        if (!tour.playing || tour.arrived) map3d.getSource('tour-live').setData({ type: 'FeatureCollection', features: [] });
+      } catch (e) { /* 圖層尚未就緒則略過，下次重繪補上 */ }
     }
     function drawLive3D(pathPts, frac, cBcss) {
       if (!map3dReady) return;
