@@ -1011,14 +1011,25 @@
     function syncBasemapToTheme(theme) {
       if (!map || !lightBase || !darkBase) return;
       const want = theme === 'dark' ? darkBase : lightBase;
-      if (currentBase === want || map.hasLayer(want)) { currentBase = want; return; }
-      // 僅在目前為晝/夜預設底圖時自動跟隨；使用者若手選衛星等其他底圖則尊重選擇
-      const autoSwap = (currentBase === lightBase || currentBase === darkBase);
-      if (!autoSwap) return;
-      if (currentBase && map.hasLayer(currentBase)) map.removeLayer(currentBase);
+      if (map.hasLayer(want)) { currentBase = want; return; }
+      // 僅在目前為晝/夜預設底圖時自動跟隨；使用者若手選衛星等其他底圖則尊重選擇。
+      // 但若圖面上已無任何已知底圖（如底圖載入失敗被移除），則強制補上對應主題底圖。
+      const autoSwap = (currentBase === lightBase || currentBase === darkBase || !currentBase);
+      let hasAnyBase = false;
+      try {
+        hasAnyBase = Object.values(baseMaps).some(l => { try { return map.hasLayer(l); } catch (e) { return false; } });
+      } catch (e) {}
+      if (!autoSwap && hasAnyBase) return;
+      try {
+        Object.values(baseMaps).forEach(l => { try { if (map.hasLayer(l)) map.removeLayer(l); } catch (e) {} });
+      } catch (e) {}
       want.addTo(map);
+      // 圖磚層疊加群組（LayerGroup）加入後確保重繪取圖
+      try {
+        if (want.eachLayer) want.eachLayer(l => { if (l.redraw) l.redraw(); });
+        else if (want.redraw) want.redraw();
+      } catch (e) {}
       currentBase = want;
-      if (want._url) want.redraw && want.redraw();
     }
     function syncMap3DSkyToTheme(theme) {
       if (typeof map3d === 'undefined' || !map3d || !map3dReady || !map3d.getStyle) return;
@@ -1051,15 +1062,19 @@
       const cartoVoyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         maxZoom: 19, subdomains: 'abcd', attribution: '© CARTO'
       });
-      // CartoDB 夜卷（深色）・知性夜航底圖
-      const cartoDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19, subdomains: 'abcd', attribution: '© CARTO'
+      // Esri 暗灰夜卷（免 key）・知性夜航底圖：暗灰底＋注記疊加，維持地名可讀性
+      const esriDarkBase = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19, attribution: '© Esri, HERE, Garmin, OpenStreetMap contributors'
       });
+      const esriDarkRef = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19
+      });
+      const esriDark = L.layerGroup([esriDarkBase, esriDarkRef]);
 
       lightBase = googleRoads;
-      darkBase = cartoDark;
+      darkBase = esriDark;
       const initialTheme = getPreferredTheme();
-      const initialBase = initialTheme === 'dark' ? cartoDark : googleRoads;
+      const initialBase = initialTheme === 'dark' ? esriDark : googleRoads;
       initialBase.addTo(map);
       currentBase = initialBase;
 
@@ -1070,7 +1085,7 @@
         "🛰️ Google Maps 衛星圖": googleHybrid,
         "🇹🇼 臺灣通用電子地圖 (NLSC)": nlscEmap,
         "🎨 CartoDB 全彩圖": cartoVoyager,
-        "🌙 CartoDB 夜卷圖": cartoDark
+        "🌙 Esri 暗灰夜卷圖": esriDark
       };
 
       L.control.layers(baseMaps, null, { position: 'topright', collapsed: true }).addTo(map);
