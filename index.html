@@ -1,23 +1,59 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-TW" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>金門風獅爺巡禮</title>
+  <meta name="color-scheme" content="light dark">
+  <title>金門風獅爺巡禮・深度知性旅行</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;600;700;900&family=Noto+Sans+TC:wght@400;500;700&display=swap">
   <script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script>
   <style>
+    /* ===== 深度知性旅行・主題變數（晝卷 / 夜卷） ===== */
+    :root {
+      --paper: #f4efe2; --bg: #f4efe2; --surface: #fbf8ef; --surface-2: #ece3cf;
+      --ink: #2b2620; --muted: #6f6656; --faint: #9a9081;
+      --line: #d9cdb2; --line-soft: #e7ddc6;
+      --accent: #8c6a2f; --accent-ink: #fffaf0; --teal: #2f5d50; --seal: #b3392b;
+      --card-shadow: 0 1px 2px rgba(43,38,32,0.06), 0 4px 14px rgba(43,38,32,0.07);
+      --header-bg: linear-gradient(120deg, #211d17 0%, #38332a 55%, #2f5d50 135%);
+      --header-ink: #f2e9d5; --header-sub: #c9b98f;
+      --map-filter: none;
+      --serif: "Noto Serif TC", "Songti TC", "PMingLiU", serif;
+      --sans: "Noto Sans TC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+    html[data-theme="dark"] {
+      --paper: #14171d; --bg: #14171d; --surface: #1d222b; --surface-2: #262c38;
+      --ink: #e9dfc6; --muted: #aca184;
+      --faint: #7d7666;
+      --line: #3a4150; --line-soft: #2b313d;
+      --accent: #c9a86a; --accent-ink: #1a1408; --teal: #7fb0a0; --seal: #d96a5a;
+      --card-shadow: 0 1px 2px rgba(0,0,0,0.4), 0 6px 20px rgba(0,0,0,0.45);
+      --header-bg: linear-gradient(120deg, #0d1015 0%, #1a2029 60%, #233730 135%);
+      --header-ink: #ece1c6; --header-sub: #a99c78;
+      --map-filter: none;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, "Noto Sans TC", sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: #f8fafc; color: #0f172a; }
-    header { background: linear-gradient(135deg, #1e3a8a, #2563eb); color: white; padding: 10px 18px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 1000; }
-    header h1 { font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    body { font-family: var(--sans); display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: var(--bg); color: var(--ink); transition: background 0.3s, color 0.3s; }
+    body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.5;
+      background-image: radial-gradient(rgba(140,106,47,0.07) 1px, transparent 1px); background-size: 22px 22px; }
+    html[data-theme="dark"] body::before { background-image: radial-gradient(rgba(201,168,106,0.06) 1px, transparent 1px); }
+    header { background: var(--header-bg); color: var(--header-ink); padding: 10px 18px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.25); z-index: 1000; border-bottom: 1px solid rgba(201,168,106,0.45); position: relative; }
+    header h1 { font-family: var(--serif); font-size: 1.15rem; font-weight: 900; display: flex; align-items: center; gap: 10px; letter-spacing: 0.12em; }
+    header h1 .brand-sub { font-size: 0.66rem; font-weight: 500; letter-spacing: 0.32em; color: var(--header-sub); border: 1px solid rgba(201,168,106,0.5); padding: 3px 8px 2px; border-radius: 2px; white-space: nowrap; }
+    header h1 i { color: var(--accent); }
+    html[data-theme="dark"] header h1 i { color: var(--accent); }
     .header-actions { display: flex; gap: 8px; align-items: center; }
-    .btn { background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s; }
-    .btn:hover { background: rgba(255,255,255,0.3); }
-    .btn-primary { background: #f59e0b; border-color: #d97706; color: #0f172a; font-weight: 600; }
-    .btn-primary:hover { background: #d97706; color: white; }
+    .btn { background: rgba(242,233,213,0.08); color: var(--header-ink); border: 1px solid rgba(201,168,106,0.4); padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s; font-family: var(--sans); }
+    .btn:hover { background: rgba(201,168,106,0.25); border-color: var(--accent); }
+    .btn-primary { background: var(--seal); border-color: var(--seal); color: #fff8ee; font-weight: 600; }
+    .btn-primary:hover { background: #93301f; color: #fff; }
+    html[data-theme="dark"] .btn-primary { background: var(--accent); border-color: var(--accent); color: #1a1408; }
+    html[data-theme="dark"] .btn-primary:hover { background: #ddbe82; }
     .btn.icon-only { width: 36px; height: 36px; padding: 0; justify-content: center; font-size: 0.95rem; }
     .player-header { display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; font-weight: 700; color: #fde68a; }
     .player-header .pbtn.mini { min-width: 28px; height: 26px; font-size: 0.72rem; padding: 0 6px; }
@@ -53,26 +89,29 @@
     .scoot3d-shadow { width: 56px; height: 9px; border-radius: 50%; background: rgba(0,0,0,0.3); filter: blur(2px); margin-top: -4px; }
     .scoot3d-svg { animation: scoot3d-bob 0.7s ease-in-out infinite; transform: perspective(300px) rotateX(12deg); }
     @keyframes scoot3d-bob { 0%,100% { translate: 0 0; } 50% { translate: 0 -3px; } }
-    #sidebar { width: 390px; background: white; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; height: 100%; z-index: 10; box-shadow: -2px 0 6px rgba(0,0,0,0.05); }
-    .filter-bar { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; background: #f1f5f9; display: flex; gap: 5px; flex-wrap: wrap; }
-    .filter-btn { padding: 3px 8px; border-radius: 12px; border: 1px solid #cbd5e1; background: white; font-size: 0.75rem; cursor: pointer; color: #475569; transition: all 0.2s; }
-    .filter-btn.active { background: #2563eb; color: white; border-color: #2563eb; font-weight: 600; }
-    .stats-bar { padding: 6px 12px; font-size: 0.78rem; color: #64748b; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; }
-    .list-container { flex: 1; overflow-y: auto; padding: 10px; }
-    .stop-card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s; position: relative; display: flex; gap: 10px; }
-    .stop-card:hover { border-color: #3b82f6; box-shadow: 0 2px 8px rgba(59,130,246,0.15); transform: translateY(-1px); }
-    .stop-card.active { border-color: #2563eb; background: #eff6ff; }
-    .stop-num-badge { background: #2563eb; color: white; font-size: 0.8rem; font-weight: 700; width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .stop-thumb-box { width: 70px; height: 70px; border-radius: 6px; overflow: hidden; background: #e2e8f0; flex-shrink: 0; position: relative; }
-    .stop-thumb { width: 100%; height: 100%; object-fit: cover; }
+    #sidebar { width: 390px; background: var(--surface); border-left: 1px solid var(--line); display: flex; flex-direction: column; height: 100%; z-index: 10; box-shadow: -2px 0 12px rgba(43,38,32,0.08); position: relative; }
+    #sidebar::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: linear-gradient(180deg, var(--accent), transparent 70%); opacity: 0.6; pointer-events: none; }
+    .filter-bar { padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--surface-2); display: flex; gap: 5px; flex-wrap: wrap; }
+    .filter-btn { padding: 3px 10px; border-radius: 2px; border: 1px solid var(--line); background: var(--surface); font-size: 0.75rem; cursor: pointer; color: var(--muted); transition: all 0.2s; font-family: var(--sans); }
+    .filter-btn.active { background: var(--ink); color: var(--paper); border-color: var(--ink); font-weight: 600; }
+    html[data-theme="dark"] .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #1a1408; }
+    .stats-bar { padding: 6px 12px; font-size: 0.76rem; letter-spacing: 0.06em; color: var(--muted); background: var(--surface); border-bottom: 1px solid var(--line-soft); display: flex; justify-content: space-between; }
+    .list-container { flex: 1; overflow-y: auto; padding: 10px; background: var(--bg); }
+    .stop-card { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--line); border-radius: 4px; padding: 10px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s; position: relative; display: flex; gap: 10px; box-shadow: var(--card-shadow); }
+    .stop-card:hover { border-color: var(--accent); border-left-color: var(--accent); box-shadow: var(--card-shadow); transform: translateY(-1px); }
+    .stop-card.active { border-color: var(--accent); border-left-color: var(--seal); background: var(--surface); box-shadow: var(--card-shadow); }
+    .stop-num-badge { background: var(--ink); color: var(--paper); font-family: var(--serif); font-size: 0.8rem; font-weight: 700; width: 32px; height: 32px; border-radius: 3px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid var(--accent); }
+    .stop-thumb-box { width: 70px; height: 70px; border-radius: 3px; overflow: hidden; background: var(--surface-2); flex-shrink: 0; position: relative; border: 1px solid var(--line); }
+    .stop-thumb { width: 100%; height: 100%; object-fit: cover; filter: sepia(0.12) contrast(1.02); }
+    html[data-theme="dark"] .stop-thumb { filter: brightness(0.92) contrast(1.05); }
     .stop-photo-count { position: absolute; bottom: 2px; right: 2px; background: rgba(0,0,0,0.65); color: white; font-size: 0.65rem; padding: 1px 4px; border-radius: 3px; }
     .stop-details { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
-    .stop-name { font-size: 0.9rem; font-weight: 700; color: #0f172a; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .stop-time { font-size: 0.75rem; color: #64748b; margin-bottom: 2px; }
-    .stop-loc { font-size: 0.74rem; color: #0284c7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stop-name { font-family: var(--serif); font-size: 0.92rem; font-weight: 700; letter-spacing: 0.06em; color: var(--ink); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stop-time { font-size: 0.75rem; color: var(--muted); margin-bottom: 2px; }
+    .stop-loc { font-size: 0.74rem; color: var(--teal); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .badge-status { display: inline-block; padding: 1px 5px; border-radius: 4px; font-size: 0.68rem; font-weight: 600; }
-    .status-pinned { background: #dcfce7; color: #15803d; }
-    .status-wait { background: #fef3c7; color: #b45309; }
+    .status-pinned { background: rgba(47,93,80,0.14); color: var(--teal); border: 1px solid currentColor; }
+    .status-wait { background: rgba(179,57,43,0.1); color: var(--seal); border: 1px solid currentColor; }
 
     /* 帶有站點數字的旗標 */
     .numbered-pin {
@@ -84,42 +123,50 @@
     }
     .pin-label { transform: rotate(45deg); }
 
-    /* 旗標展開彈窗 */
+    /* 旗標展開彈窗・卷軸卡式 */
     .popup-box { width: 290px; font-family: inherit; }
-    .popup-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
-    .popup-title { font-size: 0.95rem; font-weight: 700; color: #1e3a8a; }
-    .popup-badge { background: #dbeafe; color: #1d4ed8; font-size: 0.7rem; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
-    .popup-meta { font-size: 0.75rem; color: #475569; margin-bottom: 6px; }
-    .popup-meta i { width: 14px; text-align: center; color: #64748b; }
+    .popup-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+    .popup-title { font-family: var(--serif); font-size: 0.95rem; font-weight: 700; letter-spacing: 0.08em; color: var(--ink); }
+    .popup-badge { background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); font-size: 0.7rem; font-weight: 600; padding: 2px 6px; border-radius: 3px; }
+    .popup-meta { font-size: 0.75rem; color: var(--muted); margin-bottom: 6px; line-height: 1.6; }
+    .popup-meta i { width: 14px; text-align: center; color: var(--accent); }
     .popup-gallery { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0; margin-bottom: 8px; }
-    .gallery-img { width: 75px; height: 55px; object-fit: cover; border-radius: 4px; border: 1px solid #cbd5e1; cursor: pointer; }
-    .popup-main-img { width: 100%; height: 165px; object-fit: cover; border-radius: 6px; margin-bottom: 6px; }
+    .gallery-img { width: 75px; height: 55px; object-fit: cover; border-radius: 3px; border: 1px solid var(--line); cursor: pointer; }
+    .popup-main-img { width: 100%; height: 165px; object-fit: cover; border-radius: 4px; margin-bottom: 6px; border: 1px solid var(--line); }
     .popup-actions { display: flex; gap: 5px; }
-    .popup-link { flex: 1; text-align: center; padding: 5px 3px; background: #2563eb; color: white; text-decoration: none; border-radius: 4px; font-size: 0.68rem; font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 3px; }
-    .leaflet-control-layers { border-radius: 8px !important; box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important; font-size: 0.8rem !important; }
-    .drop-overlay { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(37,99,235,0.88); color: white; z-index: 9999; justify-content: center; align-items: center; flex-direction: column; gap: 12px; font-size: 1.15rem; font-weight: 600; }
+    .popup-link { flex: 1; text-align: center; padding: 5px 3px; background: var(--ink); color: var(--paper); text-decoration: none; border-radius: 3px; font-size: 0.68rem; font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 3px; border: 1px solid var(--ink); }
+    html[data-theme="dark"] .popup-link { background: var(--accent); border-color: var(--accent); color: #1a1408; }
+    .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface) !important; color: var(--ink) !important; border: 1px solid var(--line); }
+    .leaflet-container { background: var(--surface-2); font-family: var(--sans); }
+    html[data-theme="dark"] .leaflet-tile-pane { filter: brightness(0.92) contrast(1.02); }
+    .leaflet-control-layers, .leaflet-bar a { background: var(--surface) !important; color: var(--ink) !important; border-color: var(--line) !important; }
+    .leaflet-control-layers { border-radius: 6px !important; box-shadow: var(--card-shadow) !important; font-size: 0.8rem !important; }
+    .leaflet-control-attribution { background: color-mix(in srgb, var(--surface) 80%, transparent) !important; color: var(--muted) !important; font-size: 0.62rem !important; }
+    .leaflet-control-attribution a { color: var(--muted) !important; }
+    #map3d .maplibregl-popup-content { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+    .drop-overlay { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(43,38,32,0.9); color: var(--header-ink); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; gap: 12px; font-size: 1.15rem; font-weight: 600; }
     /* ===== 導覽播放器：風獅爺巡禮 ===== */
     #map { position: relative; }
     /* 照片資訊卡：錨定在對應站點旗標正上方，機車移動時不跟著走；抵達時地圖將其置中 */
-    .tour-popup .leaflet-popup-content-wrapper { border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 6px 24px rgba(0,0,0,0.3); }
-    .tour-popup .leaflet-popup-content { margin: 10px 12px; width: 300px !important; line-height: 1.4; }
-    /* 漂亮卡牌風格：站點色漸層頭＋直式照片區（主上副下）＋輕快彈跳進出場 */
-    .tp-card { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); border-radius: 10px; }
-    .tp-head { display: flex; align-items: center; gap: 6px; background: linear-gradient(135deg, var(--tp-accent, #2563eb), #1e3a8a 130%); color: white; border-radius: 10px; padding: 7px 9px; margin-bottom: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.18); }
-    .tp-num { background: rgba(255,255,255,0.92); color: #0f172a; font-weight: 800; font-size: 0.78rem; border-radius: 6px; padding: 2px 7px; white-space: nowrap; }
-    .tp-title { flex: 1; font-weight: 700; font-size: 0.86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+    .tour-popup .leaflet-popup-content-wrapper { border-radius: 6px; border: 1px solid var(--line); box-shadow: var(--card-shadow); }
+    .tour-popup .leaflet-popup-content { margin: 10px 12px; width: 300px !important; line-height: 1.5; }
+    /* 知性卷軸卡：墨色章首＋絹底照片區 */
+    .tp-card { background: var(--surface); border-radius: 4px; }
+    .tp-head { display: flex; align-items: center; gap: 6px; background: linear-gradient(135deg, var(--tp-accent, var(--ink)), rgba(0,0,0,0.55) 160%); color: #f6f0dd; border-radius: 4px; padding: 7px 9px; margin-bottom: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); border: 1px solid rgba(201,168,106,0.35); }
+    .tp-num { background: rgba(246,240,221,0.94); color: #211d17; font-family: var(--serif); font-weight: 800; font-size: 0.78rem; border-radius: 3px; padding: 2px 7px; white-space: nowrap; }
+    .tp-title { flex: 1; font-family: var(--serif); font-weight: 700; letter-spacing: 0.08em; font-size: 0.86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .tp-x { background: rgba(255,255,255,0.2); border: none; color: white; border-radius: 6px; width: 24px; height: 24px; cursor: pointer; font-size: 0.75rem; flex-shrink: 0; }
     .tp-x:hover { background: rgba(255,255,255,0.35); }
-    .tp-meta { font-size: 0.73rem; color: #475569; }
+    .tp-meta { font-size: 0.73rem; color: var(--muted); }
     .tp-photos { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
-    .tp-main-v { width: 100%; height: 150px; object-fit: cover; border-radius: 10px; border: 2px solid var(--tp-accent, #2563eb); cursor: pointer; display: block; box-shadow: 0 2px 10px rgba(0,0,0,0.15); }
+    .tp-main-v { width: 100%; height: 150px; object-fit: cover; border-radius: 4px; border: 1px solid var(--tp-accent, var(--line)); cursor: pointer; display: block; box-shadow: var(--card-shadow); }
     .tp-main-v:hover { opacity: 0.9; }
     .tp-main-v.tall { height: 228px; } /* 無副照片時整個照片區都給主照片 */
     .tp-subs-v { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; max-height: 112px; overflow-y: auto; }
-    .tp-subs-v img { width: 100%; height: 48px; object-fit: cover; border-radius: 6px; border: 2px solid #e2e8f0; cursor: pointer; display: block; background: white; }
-    .tp-subs-v img:hover { opacity: 0.85; border-color: var(--tp-accent, #2563eb); transform: translateY(-1px); }
-    .tp-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; font-size: 0.7rem; color: #64748b; }
-    .tp-foot a { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .tp-subs-v img { width: 100%; height: 48px; object-fit: cover; border-radius: 3px; border: 1px solid var(--line); cursor: pointer; display: block; background: var(--surface-2); }
+    .tp-subs-v img:hover { opacity: 0.85; border-color: var(--tp-accent, var(--accent)); transform: translateY(-1px); }
+    .tp-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; font-size: 0.7rem; color: var(--muted); }
+    .tp-foot a { color: var(--teal); text-decoration: none; font-weight: 600; }
     /* 輕快動感：抵達彈跳入場、中途同風格收起（變形原點在卡片底部尖端） */
     .tp-hidden { visibility: hidden; }
     .tp-anim-in { animation: tp-pop-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); transform-origin: 50% 100%; }
@@ -137,28 +184,31 @@
     #playerBar {
       position: absolute; left: 12px; bottom: 12px; z-index: 600;
       width: min(600px, calc(100% - 24px));
-      background: rgba(15,23,42,0.92); color: white; border-radius: 12px;
-      box-shadow: 0 6px 24px rgba(0,0,0,0.35); padding: 8px 10px;
-      display: flex; flex-direction: column; gap: 6px; backdrop-filter: blur(4px);
+      background: var(--surface); background: color-mix(in srgb, var(--surface) 92%, transparent); color: var(--ink); border-radius: 6px;
+      border: 1px solid var(--line);
+      box-shadow: var(--card-shadow); padding: 8px 10px;
+      display: flex; flex-direction: column; gap: 6px; backdrop-filter: blur(8px);
     }
+    .player-header { display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.2em; color: var(--accent); font-family: var(--serif); }
     .player-row { display: flex; align-items: center; gap: 6px; }
-    .pbtn { background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 8px; min-width: 36px; height: 34px; cursor: pointer; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 0 8px; }
-    .pbtn:hover { background: rgba(255,255,255,0.28); }
-    .pbtn.play { background: #f59e0b; border-color: #d97706; color: #0f172a; font-size: 1rem; min-width: 46px; }
-    .pbtn.play:hover { background: #d97706; color: white; }
-    .pbtn.on { background: #2563eb; border-color: #1d4ed8; }
-    #tourSlider { flex: 1; min-width: 60px; accent-color: #f59e0b; height: 24px; cursor: pointer; }
-    #tourLabel { font-size: 0.75rem; white-space: nowrap; color: #fde68a; font-weight: 700; min-width: 86px; text-align: center; }
+    .pbtn { background: var(--surface-2); border: 1px solid var(--line); color: var(--ink); border-radius: 4px; min-width: 36px; height: 34px; cursor: pointer; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 0 8px; }
+    .pbtn:hover { border-color: var(--accent); color: var(--accent); }
+    .pbtn.play { background: var(--seal); border-color: var(--seal); color: #fff8ee; font-size: 1rem; min-width: 46px; }
+    .pbtn.play:hover { filter: brightness(1.1); color: #fff; }
+    html[data-theme="dark"] .pbtn.play { background: var(--accent); border-color: var(--accent); color: #1a1408; }
+    .pbtn.on { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+    #tourSlider { flex: 1; min-width: 60px; accent-color: var(--accent); height: 24px; cursor: pointer; }
+    #tourLabel { font-size: 0.75rem; white-space: nowrap; color: var(--muted); font-weight: 700; min-width: 86px; text-align: center; font-variant-numeric: tabular-nums; }
     .speed-group { display: flex; gap: 4px; }
     .speed-group .pbtn { min-width: 0; height: 28px; font-size: 0.72rem; padding: 0 7px; }
-    .speed-group .pbtn.on { background: #f59e0b; color: #0f172a; border-color: #d97706; font-weight: 800; }
-    .player-sub { display: flex; align-items: center; gap: 10px; font-size: 0.72rem; color: #cbd5e1; flex-wrap: wrap; }
+    .speed-group .pbtn.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 800; }
+    .player-sub { display: flex; align-items: center; gap: 10px; font-size: 0.72rem; color: var(--muted); flex-wrap: wrap; }
     .player-sub label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
-    .player-sub input[type="checkbox"] { accent-color: #f59e0b; width: 14px; height: 14px; cursor: pointer; }
-    #tourStopName { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: white; font-weight: 600; }
+    .player-sub input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer; }
+    #tourStopName { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); font-weight: 600; font-family: var(--serif); letter-spacing: 0.06em; }
     /* Q版雙人機車圖示 */
     .scooter-wrap { display: flex; flex-direction: column; align-items: center; pointer-events: none; }
-    .scooter-bubble { background: #0f172a; color: #fde68a; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 8px; white-space: nowrap; margin-bottom: 1px; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
+    .scooter-bubble { background: var(--ink); color: var(--paper); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 8px; white-space: nowrap; margin-bottom: 1px; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
     .scooter-svg { animation: scoot-bob 0.7s ease-in-out infinite; filter: drop-shadow(0 3px 3px rgba(0,0,0,0.35)); }
     .scooter-svg.flip { transform: scaleX(-1); }
     .scooter-svg.flip { animation-name: scoot-bob-flip; }
@@ -191,23 +241,23 @@
       .main-container { flex-direction: column; height: calc(100dvh - 52px - 48px); }
       #map { flex: 1; height: auto; min-height: 0; }
       /* 側滑抽屜：預設收合 (translateX 藏左側)，.drawer-open 時滑出 */
-      #sidebar { position: absolute; left: 0; top: 0; bottom: 0; width: min(84vw, 340px); height: auto; margin-top: 0; border-left: none; border-right: 1px solid #e2e8f0; border-radius: 0 12px 12px 0; transform: translateX(-105%); transition: transform 0.28s ease; z-index: 800; box-shadow: 2px 0 12px rgba(0,0,0,0.25); padding-bottom: env(safe-area-inset-bottom); }
+      #sidebar { position: absolute; left: 0; top: 0; bottom: 0; width: min(84vw, 340px); height: auto; margin-top: 0; border-left: none; border-right: 1px solid var(--line); border-radius: 0 8px 8px 0; transform: translateX(-105%); transition: transform 0.28s ease; z-index: 800; box-shadow: 2px 0 12px rgba(0,0,0,0.25); padding-bottom: env(safe-area-inset-bottom); }
       .main-container.drawer-open #sidebar { transform: translateX(0); }
       #scrim { position: absolute; inset: 0; background: rgba(0,0,0,0.35); z-index: 700; }
       .main-container.drawer-open #scrim { display: block; }
-      .drawer-top { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-weight: 700; font-size: 0.88rem; background: #f8fafc; border-radius: 0 12px 0 0; }
-      #drawerClose { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; border: 1px solid #cbd5e1; background: white; cursor: pointer; color: #475569; }
+      .drawer-top { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--line); font-weight: 700; font-size: 0.88rem; font-family: var(--serif); letter-spacing: 0.15em; background: var(--surface-2); color: var(--ink); border-radius: 0 8px 0 0; }
+      #drawerClose { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; color: var(--muted); }
       #sheetHandle { display: none; }
       /* 相容舊 map-mode / list-mode：list-mode 視為抽屜開啟 */
       .main-container.map-mode #sidebar { height: auto; }
       .main-container.list-mode #map { display: block; }
       .main-container.list-mode #sidebar { flex: none; height: auto; margin-top: 0; border-radius: 0 12px 12px 0; }
       .main-container.map-mode #map { flex: 1; }
-      #mobileTabs { display: flex; gap: 8px; padding: 6px 10px calc(6px + env(safe-area-inset-bottom)); background: white; border-top: 1px solid #e2e8f0; z-index: 1000; }
-      #mobileTabs button { flex: 1; min-height: 40px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 0.85rem; font-weight: 600; color: #475569; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
-      #mobileTabs button.active { background: #2563eb; color: white; border-color: #2563eb; }
-      #locateFab { display: flex; position: absolute; right: 12px; bottom: 12px; width: 44px; height: 44px; border-radius: 50%; border: none; background: white; color: #2563eb; box-shadow: 0 2px 8px rgba(0,0,0,0.25); z-index: 500; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; }
-      #listFab { display: flex; position: absolute; left: 12px; top: 12px; width: 44px; height: 44px; border-radius: 50%; border: none; background: #0f172a; color: #fde68a; box-shadow: 0 2px 8px rgba(0,0,0,0.3); z-index: 600; align-items: center; justify-content: center; font-size: 1.05rem; cursor: pointer; }
+      #mobileTabs { display: flex; gap: 8px; padding: 6px 10px calc(6px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--line); z-index: 1000; }
+      #mobileTabs button { flex: 1; min-height: 40px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface-2); font-size: 0.85rem; font-weight: 600; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+      #mobileTabs button.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+      #locateFab { display: flex; position: absolute; right: 12px; bottom: 12px; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--accent); box-shadow: var(--card-shadow); z-index: 500; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; }
+      #listFab { display: flex; position: absolute; left: 12px; top: 12px; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--accent); background: var(--ink); color: var(--paper); box-shadow: 0 2px 8px rgba(0,0,0,0.3); z-index: 600; align-items: center; justify-content: center; font-size: 1.05rem; cursor: pointer; }
       .main-container.drawer-open #listFab { display: none; }
       .filter-bar { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
       .filter-btn { min-height: 32px; white-space: nowrap; flex-shrink: 0; }
@@ -238,14 +288,23 @@
       #tourLabel { min-width: 64px; }
       .pbtn { min-width: 32px; height: 32px; }
     }
+    /* 卷軸・知性細線 */
+    .list-container::-webkit-scrollbar, .tp-subs-v::-webkit-scrollbar { width: 8px; height: 8px; }
+    .list-container::-webkit-scrollbar-thumb, .tp-subs-v::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+    .list-container::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+    .list-container::-webkit-scrollbar-track { background: transparent; }
+    #themeToggleIcon { transition: transform 0.35s ease; }
+    #themeToggle:hover #themeToggleIcon { transform: rotate(40deg); }
+    @media (max-width: 560px) { header h1 .brand-sub { display: none; } }
   </style>
 </head>
 <body>
 
   <header>
-    <h1><i class="fa-solid fa-flag"></i> 金門風獅爺巡禮</h1>
+    <h1><i class="fa-solid fa-torii-gate"></i> 金門風獅爺巡禮 <span class="brand-sub">深度知性旅行</span></h1>
     <button class="btn icon-only" id="menuToggle" onclick="document.querySelector('.header-actions').classList.toggle('open')" title="功能選單"><i class="fa-solid fa-bars"></i></button>
     <div class="header-actions">
+      <button class="btn icon-only" id="themeToggle" onclick="toggleTheme()" title="切換晝卷 / 夜卷"><i class="fa-solid fa-circle-half-stroke" id="themeToggleIcon"></i></button>
       <button class="btn icon-only" id="modeToggle" onclick="toggleMapMode()" title="切換 2D / 3D 地形"><i class="fa-solid fa-mountain" id="modeToggleIcon"></i></button>
       <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none;" onchange="handleFiles(this.files)">
       <button class="btn btn-primary icon-only" onclick="document.getElementById('folderInput').click()" title="匯入照片自動定位 GPS">
@@ -261,7 +320,7 @@
       <!-- 播放器：可展開/收合；手機版預設收合 -->
       <div id="playerBar">
         <div class="player-header">
-          <span class="player-title"><i class="fa-solid fa-motorcycle"></i> 導覽播放</span>
+          <span class="player-title"><i class="fa-solid fa-book-open"></i> 行旅導覽・風獅爺巡禮</span>
           <button class="pbtn mini play" id="playBtnMini" onclick="togglePlay()" title="播放 / 暫停"><i class="fa-solid fa-play"></i></button>
           <button class="pbtn mini" id="playerToggle" onclick="togglePlayerBar()" title="展開 / 收合"><i class="fa-solid fa-chevron-down"></i></button>
         </div>
@@ -918,7 +977,56 @@
     let currentFilter = 'ALL';
     let markers = {};
     let map;
+    let baseMaps = {}, lightBase = null, darkBase = null, currentBase = null;
     const svgFallback = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='200' fill='%23e2e8f0'><rect width='300' height='200'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='%2364748b' font-size='14'>風獅爺相片</text></svg>";
+
+    // ===== 晝卷 / 夜卷主題：localStorage＋系統偏好，地圖底圖連動 =====
+    const THEME_STORE_KEY = 'wls_theme_v1';
+    function getPreferredTheme() {
+      try {
+        const saved = localStorage.getItem(THEME_STORE_KEY);
+        if (saved === 'light' || saved === 'dark') return saved;
+      } catch (e) {}
+      return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    }
+    function applyTheme(theme, opts) {
+      const t = (theme === 'dark') ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', t);
+      try { document.querySelector('meta[name="color-scheme"]').setAttribute('content', t); } catch (e) {}
+      if (!opts || opts.persist !== false) {
+        try { localStorage.setItem(THEME_STORE_KEY, t); } catch (e) {}
+      }
+      const ic = document.getElementById('themeToggleIcon');
+      if (ic) ic.className = t === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+      const btn = document.getElementById('themeToggle');
+      if (btn) btn.title = t === 'dark' ? '切換晝卷（淺色）' : '切換夜卷（深色）';
+      syncBasemapToTheme(t);
+      syncMap3DSkyToTheme(t);
+    }
+    function toggleTheme() {
+      const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+      try { localStorage.setItem(THEME_STORE_KEY + '_manual', '1'); } catch (e) {}
+      applyTheme(cur === 'dark' ? 'light' : 'dark');
+    }
+    function syncBasemapToTheme(theme) {
+      if (!map || !lightBase || !darkBase) return;
+      const want = theme === 'dark' ? darkBase : lightBase;
+      if (currentBase === want || map.hasLayer(want)) { currentBase = want; return; }
+      // 僅在目前為晝/夜預設底圖時自動跟隨；使用者若手選衛星等其他底圖則尊重選擇
+      const autoSwap = (currentBase === lightBase || currentBase === darkBase);
+      if (!autoSwap) return;
+      if (currentBase && map.hasLayer(currentBase)) map.removeLayer(currentBase);
+      want.addTo(map);
+      currentBase = want;
+      if (want._url) want.redraw && want.redraw();
+    }
+    function syncMap3DSkyToTheme(theme) {
+      if (typeof map3d === 'undefined' || !map3d || !map3dReady || !map3d.getStyle) return;
+      try {
+        if (theme === 'dark') map3d.setSky({ 'sky-color': '#0b1226', 'horizon-color': '#2a3348', 'fog-color': '#10141d', 'fog-ground-blend': 0.7, 'horizon-fog-blend': 0.6, 'sky-horizon-blend': 0.5 });
+        else map3d.setSky({ 'sky-color': '#7db8ff', 'horizon-color': '#ffffff', 'fog-color': '#dfe9f5', 'fog-ground-blend': 0.6, 'horizon-fog-blend': 0.5, 'sky-horizon-blend': 0.4 });
+      } catch (e) {}
+    }
 
     function initMap() {
       map = L.map('map').setView([24.448, 118.375], 12);
@@ -943,19 +1051,43 @@
       const cartoVoyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         maxZoom: 19, subdomains: 'abcd', attribution: '© CARTO'
       });
+      // CartoDB 夜卷（深色）・知性夜航底圖
+      const cartoDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19, subdomains: 'abcd', attribution: '© CARTO'
+      });
 
-      googleRoads.addTo(map);
+      lightBase = googleRoads;
+      darkBase = cartoDark;
+      const initialTheme = getPreferredTheme();
+      const initialBase = initialTheme === 'dark' ? cartoDark : googleRoads;
+      initialBase.addTo(map);
+      currentBase = initialBase;
 
       // 地圖底圖切換：支援 Google Maps 與 OpenStreetMap (OSM)
-      const baseMaps = {
+      baseMaps = {
         "🗺️ Google Maps 道路圖": googleRoads,
         "🌍 OpenStreetMap (OSM)": osmStandard,
         "🛰️ Google Maps 衛星圖": googleHybrid,
         "🇹🇼 臺灣通用電子地圖 (NLSC)": nlscEmap,
-        "🎨 CartoDB 全彩圖": cartoVoyager
+        "🎨 CartoDB 全彩圖": cartoVoyager,
+        "🌙 CartoDB 夜卷圖": cartoDark
       };
 
       L.control.layers(baseMaps, null, { position: 'topright', collapsed: true }).addTo(map);
+      map.on('baselayerchange', (e) => { currentBase = e.layer; });
+
+      applyTheme(initialTheme, { persist: false });
+      try { localStorage.setItem(THEME_STORE_KEY, initialTheme); } catch (e) {}
+      if (window.matchMedia) {
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        const onSys = (ev) => {
+          let saved = null;
+          try { saved = localStorage.getItem(THEME_STORE_KEY + '_manual'); } catch (e) {}
+          if (saved) return; // 使用者手動切換過就不跟系統
+          applyTheme(ev.matches ? 'dark' : 'light');
+        };
+        if (mq.addEventListener) mq.addEventListener('change', onSys);
+      }
 
       initMobileUI();
 
@@ -1807,6 +1939,7 @@
       }
     }
     function map3dStyle() {
+      const dark = document.documentElement.getAttribute('data-theme') === 'dark';
       return {
         version: 8,
         sources: {
@@ -1822,7 +1955,9 @@
           { id: 'ref', type: 'raster', source: 'esri-ref' }
         ],
         terrain: { source: 'terrain-dem', exaggeration: 2.0 },
-        sky: { 'sky-color': '#7db8ff', 'horizon-color': '#ffffff', 'fog-color': '#dfe9f5', 'fog-ground-blend': 0.6, 'horizon-fog-blend': 0.5, 'sky-horizon-blend': 0.4 }
+        sky: dark
+          ? { 'sky-color': '#0b1226', 'horizon-color': '#2a3348', 'fog-color': '#10141d', 'fog-ground-blend': 0.7, 'horizon-fog-blend': 0.6, 'sky-horizon-blend': 0.5 }
+          : { 'sky-color': '#7db8ff', 'horizon-color': '#ffffff', 'fog-color': '#dfe9f5', 'fog-ground-blend': 0.6, 'horizon-fog-blend': 0.5, 'sky-horizon-blend': 0.4 }
       };
     }
     function initMap3D() {
