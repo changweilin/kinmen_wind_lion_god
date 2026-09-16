@@ -1194,7 +1194,7 @@
           `;
 
           marker.bindPopup(popupContent, { maxWidth: 300 });
-          marker.on('click', () => highlightCard(stop.stop_id));
+          marker.on('click', () => focusStop(stop));
           markers[stop.stop_id] = marker;
         }
       });
@@ -1236,23 +1236,36 @@
     }
 
     function focusStop(stop) {
-      highlightCard(stop.stop_id);
-      if (window.innerWidth <= 768) setMobileView('map');
-      if (is3D && map3dReady && stop.lat && stop.lng) {
-        if (!map3d) toggleMapMode(true);
-        openPopup3D(stop);
-        fly3DCinematic(stop, null);
+      if (!stop) return;
+      if (!stop.lat || !stop.lng) {
+        highlightCard(stop.stop_id);
+        alert(`【${stop.stop_number} ${stop.name}】\n拍攝時間：${stop.date} ${stop.time_display}\n內含 ${stop.photo_count} 張相片。\n尚未載入 GPS 座標。請點擊上方按鈕選取照片資料夾，系統將讀取 EXIF 自動在地圖上插上旗標！`);
         return;
       }
-      if (stop.lat && stop.lng && markers[stop.stop_id]) {
+      // 再點一次已展開的選項：收起資訊卡並取消選取（機車留在原地）
+      try {
+        if (cardOpenStopId === stop.stop_id && isSelectionCardOpen()) { closeSelectionCard(); return; }
+      } catch (e) {}
+      highlightCard(stop.stop_id);
+      if (window.innerWidth <= 768) setMobileView('map');
+      pauseTour(); // 手動選取接管：機車停下，不再自動推進
+      const i = tourStops().findIndex(x => x.stop_id === stop.stop_id);
+      if (i >= 0) {
+        // 機車移到該站＋資訊卡錨定站點旗標展開＋滑桿同步（含 3D 分支）
+        showTourStop(i, { instant: true });
+        try {
+          const in3D = (typeof is3D !== 'undefined' && is3D);
+          if (!in3D && !isFollowOn() && map) map.flyTo([stop.lat, stop.lng], 16, { duration: 1 });
+        } catch (e) {}
+      } else if (markers[stop.stop_id]) {
         map.flyTo([stop.lat, stop.lng], 16, { duration: 1 });
         markers[stop.stop_id].openPopup();
-      } else {
-        alert(`【${stop.stop_number} ${stop.name}】\n拍攝時間：${stop.date} ${stop.time_display}\n內含 ${stop.photo_count} 張相片。\n尚未載入 GPS 座標。請點擊上方按鈕選取照片資料夾，系統將讀取 EXIF 自動在地圖上插上旗標！`);
       }
+      saveUIState();
     }
 
     function highlightCard(stopId) {
+      try { selectedStopId = stopId; } catch (e) {}
       document.querySelectorAll('.stop-card').forEach(c => {
         c.classList.remove('active');
         c.style.borderColor = '';
@@ -1266,12 +1279,15 @@
         card.style.backgroundColor = color + '0d';
         card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
+      try { queueSave(); } catch (e) {}
     }
 
-    function setFilter(filter) {
+    function setFilter(filter, el) {
       currentFilter = filter;
       document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
-      event.target.classList.add('active');
+      const target = el || ((typeof event !== 'undefined' && event && event.target && event.target.classList && event.target.classList.contains('filter-btn')) ? event.target : null)
+        || document.querySelector(`.filter-btn[onclick*="'${filter}'"]`);
+      if (target) target.classList.add('active');
       renderMarkers();
       renderList();
     }
@@ -1896,6 +1912,7 @@
       tourPopup.setLatLng([stop.lat, stop.lng]);
       if (!map.hasLayer(tourPopup)) tourPopup.openOn(map);
       tourCardPopIn();
+      try { cardOpenStopId = stop.stop_id; } catch (e) {}
     }
     function swapTourMainPopup(i) {
       const stop = tourStops()[tour.idx];
@@ -2329,6 +2346,7 @@
     function togglePlay() { tour.playing ? pauseTour() : startTour(); }
     function stopTour() {
       pauseTour();
+      try { cardOpenStopId = null; } catch (e) {}
       if (map && tourPopup && map.hasLayer(tourPopup)) tourCardRetract(() => { if (map) map.closePopup(tourPopup); });
       if (typeof popup3d !== 'undefined' && popup3d) { try { popup3d.remove(); } catch (e) {} }
     }
@@ -2352,13 +2370,248 @@
       if (tour.playing && tour.arrived) scheduleNextLeg(dwellMs());
     }
 
+    // ===== UI 狀態記憶：所有參數與按鍵還原上次開啟狀態 =====
+    const UI_STATE_KEY = 'wls_ui_state_v1';
+    let uiReady = false, saveT = null, selectedStopId = null, cardOpenStopId = null;
+    // 資訊卡是否正為某站展開（2D 看 Leaflet popup 圖層，3D 看 maplibre popup）
+    function isSelectionCardOpen() {
+      try {
+        if (typeof is3D !== 'undefined' && is3D) {
+          if (typeof popup3d === 'undefined' || !popup3d) return false;
+          return (typeof popup3d.isOpen === 'function') ? popup3d.isOpen() : true;
+        }
+        return !!(map && typeof tourPopup !== 'undefined' && tourPopup && map.hasLayer(tourPopup));
+      } catch (e) { return false; }
+    }
+    // 收起資訊卡＋取消選取反白（機車留在原地，不碰導覽站序）
+    function closeSelectionCard() {
+      pauseTour();
+      try {
+        if (typeof is3D !== 'undefined' && is3D) {
+          if (typeof popup3d !== 'undefined' && popup3d) popup3d.remove();
+        } else if (map && typeof tourPopup !== 'undefined' && tourPopup && map.hasLayer(tourPopup)) {
+          tourCardRetract(() => { try { map.closePopup(tourPopup); } catch (e) {} });
+        }
+      } catch (e) {}
+      try {
+        document.querySelectorAll('.stop-card').forEach(c => {
+          c.classList.remove('active');
+          c.style.borderColor = '';
+          c.style.backgroundColor = '';
+        });
+      } catch (e) {}
+      cardOpenStopId = null;
+      try { selectedStopId = null; } catch (e) {}
+      saveUIState();
+    }
+    function loadUIState() {
+      try {
+        const raw = localStorage.getItem(UI_STATE_KEY);
+        if (!raw) return null;
+        const s = JSON.parse(raw);
+        return (s && typeof s === 'object') ? s : null;
+      } catch (e) { return null; }
+    }
+    function collectUIState() {
+      const s = { v: 1 };
+      try {
+        s.filter = currentFilter;
+        s.speed = tour.speed;
+        s.idx = tour.idx;
+        s.selectedId = selectedStopId;
+        if (!s.selectedId) {
+          try {
+            const _l = tourStops();
+            const _st = _l[Math.max(0, Math.min(tour.idx, _l.length - 1))];
+            if (_st) s.selectedId = _st.stop_id;
+          } catch (e) {}
+        }
+        try { s.cardOpenId = cardOpenStopId; } catch (e) { s.cardOpenId = null; }
+        const f = document.getElementById('followChk'), r = document.getElementById('routeChk'), l = document.getElementById('loopChk');
+        if (f) s.follow = f.checked;
+        if (r) s.route = r.checked;
+        if (l) s.loop = l.checked;
+        const bar = document.getElementById('playerBar');
+        if (bar) s.playerCollapsed = bar.classList.contains('collapsed');
+        const c = document.getElementById('dropArea');
+        if (c) s.drawerOpen = c.classList.contains('drawer-open');
+        const ha = document.querySelector('.header-actions');
+        if (ha) s.menuOpen = ha.classList.contains('open');
+        try { s.is3D = (typeof is3D !== 'undefined') ? !!is3D : false; } catch (e) { s.is3D = false; }
+        try {
+          if (baseMaps && currentBase) {
+            for (const k in baseMaps) { if (baseMaps[k] === currentBase) { s.basemap = k; break; } }
+          }
+        } catch (e) {}
+        try {
+          if (map) {
+            const ct = map.getCenter();
+            s.view = { lat: +ct.lat.toFixed(5), lng: +ct.lng.toFixed(5), zoom: map.getZoom() };
+          }
+        } catch (e) {}
+        try {
+          const listEl = document.getElementById('stopsList');
+          if (listEl) s.scroll = listEl.scrollTop;
+        } catch (e) {}
+      } catch (e) {}
+      return s;
+    }
+    function saveUIState() {
+      if (!uiReady) return;
+      try { localStorage.setItem(UI_STATE_KEY, JSON.stringify(collectUIState())); } catch (e) {}
+    }
+    function queueSave() {
+      if (!uiReady) return;
+      if (saveT) clearTimeout(saveT);
+      saveT = setTimeout(() => { saveT = null; saveUIState(); }, 400);
+    }
+    // 啟動前預套用：篩選／速度／勾選／站序（_tourInitMap 內的 render 會直接用還原值）
+    function preApplyUIState(s) {
+      if (!s) return;
+      try {
+        if (typeof s.filter === 'string') {
+          currentFilter = s.filter;
+          document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+          const t = document.querySelector(`.filter-btn[onclick*="'${s.filter}'"]`);
+          if (t) t.classList.add('active');
+        }
+        if (typeof s.speed === 'number' && [0.5, 1, 2, 4].includes(s.speed)) {
+          tour.speed = s.speed;
+          document.querySelectorAll('#speedGroup .pbtn').forEach(b => b.classList.toggle('on', parseFloat(b.dataset.speed) === s.speed));
+        }
+        const f = document.getElementById('followChk'), r = document.getElementById('routeChk'), l = document.getElementById('loopChk');
+        if (f && typeof s.follow === 'boolean') f.checked = s.follow;
+        if (r && typeof s.route === 'boolean') r.checked = s.route;
+        if (l && typeof s.loop === 'boolean') l.checked = s.loop;
+        if (typeof s.idx === 'number') {
+          const n = tourStops().length || 37;
+          tour.idx = Math.max(0, Math.min(n - 1, s.idx | 0));
+        }
+        if (typeof s.selectedId === 'number') {
+          try { selectedStopId = s.selectedId; } catch (e) {}
+        }
+      } catch (e) {}
+    }
+    // 啟動後套用：機車位置／軌跡／播放器／抽屜／底圖／視角／3D，並接上儲存鉤子
+    function postApplyUIState(s) {
+      try {
+        tourSliderSync();
+        const list = tourStops();
+        const stop = list[Math.max(0, Math.min(tour.idx, list.length - 1))];
+        if (stop) {
+          document.getElementById('tourStopName').textContent = `🛵 ${stop.stop_number} ${stop.name}`;
+          try {
+            if (typeof scooterMarker !== 'undefined' && scooterMarker && stop.lat && stop.lng) {
+              scooterMarker.setLatLng([stop.lat, stop.lng]);
+              scooterMarker.setIcon(scooterIcon(stop, false));
+            }
+          } catch (e) {}
+          try { drawTrailStatic(tour.idx, true); } catch (e) {}
+          try {
+            let selId = stop.stop_id;
+            if (s && typeof s.selectedId === 'number' && stopsData.some(x => x.stop_id === s.selectedId)) selId = s.selectedId;
+            highlightCard(selId);
+          } catch (e) {}
+        }
+        const routeOn = document.getElementById('routeChk') ? document.getElementById('routeChk').checked : true;
+        try { toggleRouteLine(routeOn); } catch (e) {}
+        if (s) {
+          if (typeof s.playerCollapsed === 'boolean') {
+            try { togglePlayerBar(!s.playerCollapsed); } catch (e) {}
+          }
+          if (window.innerWidth <= 768 && typeof s.drawerOpen === 'boolean') {
+            try { toggleDrawer(!!s.drawerOpen); } catch (e) {}
+          }
+          if (typeof s.menuOpen === 'boolean') {
+            const ha = document.querySelector('.header-actions');
+            if (ha) ha.classList.toggle('open', !!s.menuOpen);
+          }
+          try {
+            if (s.basemap && baseMaps && baseMaps[s.basemap] && map) {
+              const want = baseMaps[s.basemap];
+              if (!map.hasLayer(want)) {
+                Object.values(baseMaps).forEach(l => { try { if (map.hasLayer(l)) map.removeLayer(l); } catch (e) {} });
+                want.addTo(map);
+              }
+              currentBase = want;
+            }
+          } catch (e) {}
+          try {
+            if (s.view && isFinite(s.view.lat) && isFinite(s.view.lng) && isFinite(s.view.zoom) && map) {
+              map.setView([s.view.lat, s.view.lng], s.view.zoom);
+            }
+          } catch (e) {}
+          // 上次關閉時資訊卡正展開（2D）：靜默重開該站卡片，不搬動地圖（視角已還原）
+          try {
+            if (!s.is3D && typeof s.cardOpenId === 'number') {
+              const cstop = stopsData.find(x => x.stop_id === s.cardOpenId);
+              if (cstop && cstop.lat && cstop.lng) openTourPopup(cstop);
+            }
+          } catch (e) {}
+          try {
+            if (typeof s.scroll === 'number') {
+              const listEl = document.getElementById('stopsList');
+              if (listEl) listEl.scrollTop = s.scroll;
+            }
+          } catch (e) {}
+        }
+      } catch (e) {}
+      // ---- 接上儲存鉤子（只接一次）----
+      try {
+        if (!postApplyUIState._hooked) {
+          postApplyUIState._hooked = true;
+          const wrap = (name) => {
+            try {
+              const orig = window[name];
+              if (typeof orig !== 'function' || orig._saveWrapped) return;
+              const fn = function (...args) { const r = orig.apply(this, args); try { saveUIState(); } catch (e) {} return r; };
+              fn._saveWrapped = true;
+              window[name] = fn;
+              // 同步同作用域的直接引用（function 宣告綁定）：覆寫全域後 eval 賦值確保 setFilter(...) 等呼叫走包裝版
+              try { eval(name + ' = window[name]'); } catch (e) {}
+            } catch (e) {}
+          };
+          ['setFilter', 'setTourSpeed', 'togglePlayerBar', 'toggleDrawer', 'setMobileView', 'toggleMapMode', 'toggleRouteLine', 'showTourStop', 'seekTour', 'stepTour'].forEach(wrap);
+          ['followChk', 'routeChk', 'loopChk'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el && !el._saveBound) { el._saveBound = true; el.addEventListener('change', () => saveUIState()); }
+          });
+          const listEl = document.getElementById('stopsList');
+          if (listEl) listEl.addEventListener('scroll', () => queueSave(), { passive: true });
+          const mt = document.getElementById('menuToggle');
+          if (mt) mt.addEventListener('click', () => setTimeout(() => saveUIState(), 0));
+          if (map) {
+            map.on('moveend', () => queueSave());
+            map.on('zoomend', () => queueSave());
+            map.on('baselayerchange', () => saveUIState());
+          }
+          window.addEventListener('pagehide', () => saveUIState());
+          document.addEventListener('visibilitychange', () => { if (document.hidden) saveUIState(); });
+        }
+      } catch (e) {}
+      try {
+        if (s && s.is3D) {
+          toggleMapMode(true);
+          // 上次關閉時卡片是收起的：切入 3D 會自動開卡，補關保持一致
+          if (!s.cardOpenId && typeof popup3d !== 'undefined' && popup3d) {
+            try { popup3d.remove(); } catch (e) {}
+            cardOpenStopId = null;
+          }
+        }
+      } catch (e) {}
+    }
+
     const _tourInitMap = initMap;
     initMap = function () {
+      const saved = loadUIState();
+      preApplyUIState(saved);
       _tourInitMap();
       buildTourRoute();
-      tourSliderSync();
       updatePlayBtn();
       preloadKinmenMaps();
+      postApplyUIState(saved);
+      uiReady = true;
+      saveUIState();
     };
 
     // ===== 3D 地形圖（MapLibre + DEM 地形）：導覽播放共用同一 tour 狀態 =====
@@ -2470,7 +2723,7 @@
         + `<div class="lion3d-num" style="background:${color};">${stop.stop_id}</div>`
         + `</div><div class="lion3d-shadow"></div>`;
       el.title = `${stop.stop_number} ${stop.name}`;
-      el.onclick = () => { highlightCard(stop.stop_id); openPopup3D(stop); fly3DCinematic(stop, null); if (window.innerWidth <= 768) setMobileView('map'); };
+      el.onclick = () => { focusStop(stop); };
       return el;
     }
     // CSS 備援機車（THREE 載入失敗時使用）：一男（前・藍衣）一女（後・粉衣）
@@ -2841,7 +3094,7 @@
       if (hits.length) {
         const sid = hits[0].object.userData.stopId;
         const stop = stopsData.find(s => s.stop_id === sid);
-        if (stop) { highlightCard(sid); openPopup3D(stop); fly3DCinematic(stop, null); if (window.innerWidth <= 768) setMobileView('map'); }
+        if (stop) { focusStop(stop); }
       }
     }
     function threeTick() {
@@ -3008,6 +3261,7 @@
       if (!map3dReady || !is3D || !stop || !stop.lat) return;
       if (!popup3d) popup3d = new maplibregl.Popup({ closeButton: false, closeOnClick: false, maxWidth: '320px', offset: 26 });
       popup3d.setLngLat([stop.lng, stop.lat]).setHTML(tourPopupHtml(stop)).addTo(map3d);
+      try { cardOpenStopId = stop.stop_id; } catch (e) {}
     }
     // 平滑運鏡：抵達時依行進方位＋站號給不同 pitch／bearing／zoom，緩慢環繞取景
     // bearing 平滑狀態由 follow 共用，避免跳動
