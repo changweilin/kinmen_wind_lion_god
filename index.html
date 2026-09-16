@@ -1505,7 +1505,6 @@
     const TEMPO3D = 2;      // 3D 版行進＋停留皆為 2D 的 2 倍時長
     function travelMs() { return TRAVEL_MS * (typeof is3D !== 'undefined' && is3D ? TEMPO3D : 1) / tour.speed; }
     function dwellMs() { return DWELL_MS * (typeof is3D !== 'undefined' && is3D ? TEMPO3D : 1) / tour.speed; }
-    function legIntervalMs() { return (TRAVEL_MS + DWELL_MS) * (typeof is3D !== 'undefined' && is3D ? TEMPO3D : 1) / tour.speed; }
     const TRAIL_OPACITY = [0.95, 0.95, 0.95]; // t、t-1 不淡出；t-2 行進間以尾巴縮短代替淡出，抵達剛好消失
     const TRAIL_OPACITY_3D = [0.95, 0.95, 0.95]; // 3D：t、t-1 全飽和漸層，t-2 行進間以尾巴縮短代替淡出，抵達剛好消失
     const TRAIL_POPUP_TIP = 42; // 照片卡尖端高出站點旗標錨點的像素（旗標高32px＋10px空隙；獨立 popup offset）
@@ -2114,27 +2113,96 @@
       const tlist = tourStops(); // 同腿內 idx 不變
       const _ta = tlist[tour.idx - 3], _tb = tlist[tour.idx - 2];
       const _hasTail = _ta && _tb && _ta.lat != null && _tb.lat != null;
-      const _tailPts = _hasTail ? legPathSync(_ta, _tb) : null;
+      // 尾巴沿用可視窗凍結幾何（與靜態線同一份）：該腿稍早顯示過就沿用當時快照，
+      // 否則 OSRM 晚到會讓「尾巴形狀和稍早看到的不一樣」。無凍結才取即時快取。
+      let _tailPts = null;
+      try {
+        const _fr = legDispCache.get(tour.idx - 3);
+        if (_hasTail && _fr && _fr.key === legKey(_ta, _tb) && _fr.pts && _fr.pts.length > 1) _tailPts = _fr.pts;
+      } catch (e) {}
+      if (!_tailPts && _hasTail) _tailPts = legPathSync(_ta, _tb);
       const tailSnap = (_tailPts && _tailPts.length > 1)
         ? { pts: _tailPts, cA: rainbowHSL(_ta.stop_id), cB: rainbowHSL(_tb.stop_id) } : null;
-      const t0 = performance.now();
-      let lastDraw = 0, didZoomIn = false;
+      // 2D 增量生長預建：整腿＋尾巴漸層段開跑即建好（顏色與靜態線一致），逐幀只掛上新通過的段；
+      // 尖端/切口各一條活動線逐幀對齊機車與切口——尖端恆等於機車位置，縮放飛行中也不凍結不跳變。
+      // 背景：舊寫法每 90ms 整組 clearLayers 重建、飛行中凍結可達 600ms；長腿 2.2 秒跑 8~10 公里，
+      // 每次間隔軌跡頭就落後機車數百公尺到數公里，看起來像「走到一半變線、終點不在機車上」。
+      function buildLiveSegs(pts, c1, c2, opacity) {
+        const c = pathLengths(pts), t = c[c.length - 1] || 0;
+        const lines = [];
+        for (let i = 1; i < pts.length; i++) {
+          const mid = t ? (c[i - 1] + c[i]) / 2 / t : 0;
+          lines.push(L.polyline([pts[i - 1], pts[i]], { color: hslStr(lerpHSL(c1, c2, mid)), weight: 5, opacity, interactive: false }));
+        }
+        return { lines, cum: c, total: t };
+      }
+      const legLive = (!in3Dstart && trailLive && pathPts && pathPts.length > 1) ? buildLiveSegs(pathPts, cA, cB, TRAIL_OPACITY[0]) : null;
+      const tailLiveS = (!in3Dstart && trailLive && tailSnap) ? buildLiveSegs(tailSnap.pts, tailSnap.cA, tailSnap.cB, TRAIL_OPACITY[1]) : null;
+      let legTip = null, tailCut = null, legShown = 0, tailHidden = 0, livePrimed = false;
+      // 只建立、不掛上：初次掛載留到鏡頭穩定的第一幀（見 step），避免運鏡途中加入造成永久錯位
+      if (legLive) { legTip = L.polyline([pathPts[0], pathPts[0]], { color: hslStr(cA), weight: 5, opacity: TRAIL_OPACITY[0], interactive: false }); }
+      if (tailLiveS) { tailCut = L.polyline([tailSnap.pts[0], tailSnap.pts[0]], { color: hslStr(tailSnap.cA), weight: 5, opacity: TRAIL_OPACITY[1], interactive: false }); }
+      const t0snap = performance.now();
+      let t0 = t0snap, lastT = t0snap, lastZoom = null, lastDraw = 0, didZoomIn = false;
       const step = (now) => {
         if (myAnim !== tour.animId) return; // 已被更新的導覽請求取代
         const cur3D = (typeof is3D !== 'undefined' && is3D);
         // 模式中途切換：停掉舊模式動畫，避免 2D/3D 互相覆寫
         if (cur3D !== in3Dstart) { tour.raf = null; return; }
+        // 縮放運鏡中暫停腿時鐘：縮放插值途中加入或更新向量會用瞬時投影算出永久錯位
+        //（相鄰段錯位量不同＝斷裂、整體偏移＝跑偏；被打斷的飛行不補發修正事件）。
+        // 整組凍結隨地圖一起縮放（機車與軌跡保持黏合），穩定後無縫續跑；
+        // 節拍改抵達驅動，腿被運鏡拉長也不會被提前切斷。同縮放平移不影響投影，不用暫停。
+        if (!cur3D && map) {
+          let z = null;
+          try { z = map.getZoom(); } catch (e) {}
+          if (z === null || lastZoom === null || z !== lastZoom) {
+            if (lastZoom !== null && z !== null) t0 += (now - lastT); // 暫停時鐘（首幀除外）
+            lastT = now; if (z !== null) lastZoom = z;
+            tour.raf = requestAnimationFrame(step);
+            return;
+          }
+          lastT = now; lastZoom = z;
+        }
         const k = Math.min(1, (now - t0) / durMs);
         const pos = total ? pointAtPath(pathPts, cum, total, k) : pathPts[0];
         if (!cur3D && scooterMarker) scooterMarker.setLatLng(pos);
-        // 縮放飛行中跳過重建（向量隨地圖一起縮放）；超過 600ms 沒畫則補一次，避免卡住
-        if (!cur3D && trailLive && (now - lastDraw > 90) && (!camFlying || now - lastDraw > 600)) {
-          lastDraw = now;
-          trailLive.clearLayers();
-          // t-2 尾巴：不透明，隨 t 進度從尾端縮短（[k, 1]，與 t-1 同透明度銜接）
-          if (tailSnap) drawGradientPathRange(trailLive, tailSnap.pts, tailSnap.cA, tailSnap.cB, k, 1, TRAIL_OPACITY[1]);
-          // t 只隨機車生長出現，抵達才完整（不預畫整腿，避免還沒到就先出現並蓋掉重疊舊腿）
-          drawGradientPath(trailLive, pathPts, cA, cB, k, TRAIL_OPACITY[0]);
+        // 2D 逐幀增量生長（不做 clearLayers 整組重建）：當前腿只向前掛段、尾巴只向前摘段，
+        // 尖端每幀對齊機車位置——長腿高速下也不會軌跡跳變或終點脫鉤；飛行運鏡中同樣逐幀跟進。
+        // t 只隨機車生長出現，抵達才完整（不預畫整腿，避免還沒到就先出現並蓋掉重疊舊腿）
+        if (!cur3D && trailLive && (legLive || tailLiveS)) {
+          // 首個穩定幀才掛載（運鏡途中不加層）；之後只向前增量，不重建
+          if (!livePrimed) {
+            livePrimed = true;
+            if (legLive && legTip) trailLive.addLayer(legTip);
+            if (tailLiveS) { tailLiveS.lines.forEach(l => trailLive.addLayer(l)); if (tailCut) trailLive.addLayer(tailCut); }
+          }
+          const d = total * k;
+          if (legLive && legTip) {
+            while (legShown < legLive.lines.length && legLive.cum[legShown + 1] <= d) {
+              if (!trailLive.hasLayer(legLive.lines[legShown])) trailLive.addLayer(legLive.lines[legShown]);
+              legShown++;
+            }
+            const anchor = legShown > 0 ? pathPts[Math.min(legShown, pathPts.length - 1)] : pathPts[0];
+            legTip.setLatLngs([anchor, pos]);
+            try { legTip.setStyle({ color: hslStr(lerpHSL(cA, cB, k)) }); } catch (e) {}
+          }
+          // t-2 尾巴：不透明，隨 t 進度從頭端縮短（[k, 1]，與 t-1 同透明度銜接）
+          if (tailLiveS && tailCut) {
+            const dT = tailLiveS.total * k;
+            let ci = tailHidden;
+            while (ci < tailLiveS.lines.length && tailLiveS.cum[ci + 1] <= dT) ci++;
+            while (tailHidden < ci) {
+              if (trailLive.hasLayer(tailLiveS.lines[tailHidden])) trailLive.removeLayer(tailLiveS.lines[tailHidden]);
+              tailHidden++;
+            }
+            if (ci < tailLiveS.lines.length) {
+              if (trailLive.hasLayer(tailLiveS.lines[ci])) trailLive.removeLayer(tailLiveS.lines[ci]);
+              const cut = tailLiveS.total ? pointAtPath(tailSnap.pts, tailLiveS.cum, tailLiveS.total, k) : tailSnap.pts[0];
+              tailCut.setLatLngs([cut, tailSnap.pts[ci + 1]]);
+              if (!trailLive.hasLayer(tailCut)) trailLive.addLayer(tailCut);
+            } else if (trailLive.hasLayer(tailCut)) trailLive.removeLayer(tailCut);
+          }
         }
         if (cur3D && now - lastDraw > 90) {
           lastDraw = now;
@@ -2184,16 +2252,29 @@
         drawTrailStatic(tour.idx, true); // 抵達：當前腿完整入列，t-3 以前的不留
         openTourPopup(stopB); // 抵達：換下一張卡片並彈跳跳出
         if (isFollowOn()) centerTourPopup(); // 抵達：移動地圖讓照片資訊置中（3D 為環繞運鏡）
+        scheduleNextLeg(dwellMs()); // 抵達驅動：停留展示後再推進下一腿（取代固定節拍）
       };
+      // 看門狗：動畫若意外中斷（無抵達），逾時自動推進一腿，避免播到一半卡死；
+      // 健康的腿一定先抵達（抵達會清掉它改排停留），所以它幾乎不會開火。
+      clearTourTimer();
+      if (tour.playing) tour.timer = setTimeout(() => { if (tour.playing) tourAdvance(); }, Math.max(1500, durMs + dwellMs() + 3000));
       tour.raf = requestAnimationFrame(step);
     }
     function clearTourTimer() { if (tour.timer) { clearInterval(tour.timer); clearTimeout(tour.timer); tour.timer = null; } }
+    // 抵達驅動節拍：每腿播完（抵達）才排下一腿（停留 dwell 後推進），取代固定 setInterval——
+    // 縮放運鏡暫停腿時鐘會把腿拉長，固定節拍會提前切腿；抵達驅動則免疫（3D 節奏由 dwellMs 內含 TEMPO3D 處理）。
+    function scheduleNextLeg(delayMs) {
+      clearTourTimer();
+      if (!tour.playing) return;
+      tour.timer = setTimeout(() => { if (tour.playing) tourAdvance(); }, Math.max(0, delayMs || 0));
+    }
     function tourAdvance() {
       const list = tourStops();
       if (tour.idx >= list.length - 1) {
-        if (document.getElementById('loopChk') && document.getElementById('loopChk').checked) showTourStop(0);
+        if (document.getElementById('loopChk') && document.getElementById('loopChk').checked) { if (showTourStop(0) === true) scheduleNextLeg(dwellMs()); }
         else { tour.finished = true; pauseTour(); return; }
-      } else showTourStop(tour.idx + 1);
+      } else if (showTourStop(tour.idx + 1) === true) scheduleNextLeg(dwellMs());
+      // 行進中（回傳非 true）：抵達時排下一腿，另有看門狗兜底
     }
     function startTour() {
       if (!map) return;
@@ -2206,28 +2287,11 @@
         // 播完後再按播放：回到第一站並直接跳資訊卡，不需要等待時間
         tour.finished = false;
         showTourStop(0, { instant: true });
-        restartTourTimer(dwellMs());
+        scheduleNextLeg(dwellMs());
         return;
       }
-      const immediate = showTourStop(tour.idx, { instant: false });
-      restartTourTimer(immediate ? dwellMs() : undefined);
-    }
-    function restartTourTimer(firstDelayMs) {
-      clearTourTimer();
-      if (!tour.playing) return;
-      const leg = legIntervalMs();
-      const first = (firstDelayMs !== undefined && firstDelayMs !== null) ? firstDelayMs : leg;
-      if (first >= leg - 1) {
-        tour.timer = setInterval(tourAdvance, leg);
-      } else {
-        // 第一站已直接顯示資訊卡：下一站只需等停留時間，不需再等一次行進時間
-        tour.timer = setTimeout(() => {
-          if (!tour.playing) return;
-          tourAdvance();
-          if (!tour.playing) return;
-          tour.timer = setInterval(tourAdvance, legIntervalMs());
-        }, Math.max(0, first));
-      }
+      // 行進中：抵達時排下一腿（另有看門狗兜底）；已在站上：停留後推進
+      if (showTourStop(tour.idx, { instant: false }) === true) scheduleNextLeg(dwellMs());
     }
     function pauseTour() { tour.playing = false; ++tour.animId; ++tour.reqSeq; clearTourTimer(); if (tour.raf) { cancelAnimationFrame(tour.raf); tour.raf = null; } updatePlayBtn(); }
     function togglePlay() { tour.playing ? pauseTour() : startTour(); }
@@ -2241,19 +2305,19 @@
       pauseTour();
       showTourStop(tour.idx + d, { instant: true });
       // 手動跳站已直接顯示資訊卡：續播時只需等停留時間，不重跑一次
-      if (wasPlaying) { tour.playing = true; updatePlayBtn(); restartTourTimer(dwellMs()); }
+      if (wasPlaying) { tour.playing = true; updatePlayBtn(); scheduleNextLeg(dwellMs()); }
     }
     function seekTour(n) {
       const wasPlaying = tour.playing;
       pauseTour();
       showTourStop(n - 1, { instant: true });
-      if (wasPlaying) { tour.playing = true; updatePlayBtn(); restartTourTimer(dwellMs()); }
+      if (wasPlaying) { tour.playing = true; updatePlayBtn(); scheduleNextLeg(dwellMs()); }
     }
     function setTourSpeed(s) {
       tour.speed = s;
       document.querySelectorAll('#speedGroup .pbtn').forEach(b => b.classList.toggle('on', parseFloat(b.dataset.speed) === s));
-      // 調速不重跑當前腿：只重啟節拍，行進中動畫跑完後續腿自動用新速度
-      if (tour.playing) restartTourTimer(tour.arrived ? dwellMs() : undefined);
+      // 調速不重跑當前腿：行進中什麼都不做（抵達/看門狗自動用新速度）；停留中重排剩餘停留
+      if (tour.playing && tour.arrived) scheduleNextLeg(dwellMs());
     }
 
     const _tourInitMap = initMap;
@@ -2297,7 +2361,7 @@
         drawTrailStatic(tour.idx, true); // 切入 3D 即補上 t~t-1 靜態軌跡（與 2D 圖面 parity）
         const stop = tourStops()[tour.idx];
         if (stop) { openPopup3D(stop); fly3DCinematic(stop, null); }
-        if (tour.playing) restartTourTimer(); // 2D/3D 節奏不同（3D 為 2 倍時長）
+        if (tour.playing) scheduleNextLeg(dwellMs()); // 切換模式動畫已停、機車回到站上：在站停留後再推進
       } else if (!is3D && map) {
         // 回到 2D：清掉 3D 彈窗/live，重建 2D 機車/軌跡/資訊卡
         try { if (typeof popup3d !== 'undefined' && popup3d) popup3d.remove(); } catch (e) {}
@@ -2309,6 +2373,8 @@
           const show = document.getElementById('routeChk') ? document.getElementById('routeChk').checked : true;
           if (show) {
             try { if (trailStatic) trailStatic.addTo(map); } catch (e) {}
+            // 切換模式已停掉舊動畫：先清掉取消腿的殘留 live 增量段，再掛回圖上，避免舊殘影
+            try { if (trailLive) trailLive.clearLayers(); } catch (e) {}
             try { if (trailLive) trailLive.addTo(map); } catch (e) {}
           }
           if (!scooterMarker) {
@@ -2322,7 +2388,7 @@
           drawTrailStatic(tour.idx, true);
           if (tour.playing || (tourPopup && stop)) openTourPopup(stop);
         }
-        if (tour.playing) restartTourTimer(); // 切回 2D 節奏
+        if (tour.playing) scheduleNextLeg(dwellMs()); // 切回 2D：在站停留後再推進
       }
     }
     function map3dStyle() {
