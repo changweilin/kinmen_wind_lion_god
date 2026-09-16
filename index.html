@@ -1934,7 +1934,8 @@
     }
     // ===== 長距離運鏡：離開視野先拉全景、快抵達再拉近（2D/3D 共用判斷）=====
     const LONG_LEG_M = 1800;   // 超過此直線距離視為長距離
-    const OVERVIEW_AT = 0.72;  // 行進到 72% 時拉近目的地
+    // 抵達後拉近的停留加時：與 zoomInCam2D/zoomInCam3D 同飛行時長＋餘裕，播完才推進下一腿
+    function zoomInExtraMs(durMs) { return Math.min(1600, Math.max(800, durMs * 0.3)) + 500; }
     function straightDistM(a, b) {
       if (!a || !b || a.lat == null || b.lat == null) return 0;
       return haversineM(a.lat, a.lng, b.lat, b.lng);
@@ -2143,7 +2144,7 @@
       if (legLive) { legTip = L.polyline([pathPts[0], pathPts[0]], { color: hslStr(cA), weight: 5, opacity: TRAIL_OPACITY[0], interactive: false }); }
       if (tailLiveS) { tailCut = L.polyline([tailSnap.pts[0], tailSnap.pts[0]], { color: hslStr(tailSnap.cA), weight: 5, opacity: TRAIL_OPACITY[1], interactive: false }); }
       const t0snap = performance.now();
-      let t0 = t0snap, lastT = t0snap, lastZoom = null, lastDraw = 0, didZoomIn = false;
+      let t0 = t0snap, lastT = t0snap, lastZoom = null, lastDraw = 0;
       const step = (now) => {
         if (myAnim !== tour.animId) return; // 已被更新的導覽請求取代
         const cur3D = (typeof is3D !== 'undefined' && is3D);
@@ -2168,7 +2169,7 @@
         const pos = total ? pointAtPath(pathPts, cum, total, k) : pathPts[0];
         if (!cur3D && scooterMarker) scooterMarker.setLatLng(pos);
         // 2D 逐幀增量生長（不做 clearLayers 整組重建）：當前腿只向前掛段、尾巴只向前摘段，
-        // 尖端每幀對齊機車位置——長腿高速下也不會軌跡跳變或終點脫鉤；飛行運鏡中同樣逐幀跟進。
+        // 尖端每幀對齊機車位置；縮放運鏡中整組暫停（時鐘也停），穩定後無縫續跑。
         // t 只隨機車生長出現，抵達才完整（不預畫整腿，避免還沒到就先出現並蓋掉重疊舊腿）
         if (!cur3D && trailLive && (legLive || tailLiveS)) {
           // 首個穩定幀才掛載（運鏡途中不加層）；之後只向前增量，不重建
@@ -2230,13 +2231,8 @@
             else followCam3D._t = now;
           }
         }
-        // 長距離腿：快抵達（72%）時從全景拉近目的地，抵達置中銜接
-        if (overview && !didZoomIn && k >= OVERVIEW_AT && isFollowOn()) {
-          didZoomIn = true;
-          if (!cur3D) zoomInCam2D(stopB, durMs);
-          else zoomInCam3D(stopB, durMs);
-        }
-        // 2D 跟隨：長距離全景腿由 overview/zoomIn 接管；短腿維持原邏輯，
+        // 長距離腿：抵達後停留期間才拉近（行進中全程連續不暫停，機車連續性優先）
+        // 2D 跟隨：長距離全景腿由 overview 接管；短腿維持原邏輯，
         // 機車移動時不置中，快離開螢幕視野時才最小幅度平移（不置中）
         if (isFollowOn() && !is3D && !overview) {
           const ll = L.latLng(pos[0], pos[1]);
@@ -2251,8 +2247,15 @@
         if (cur3D && typeof map3dReady !== 'undefined' && map3dReady && map3d.getSource('tour-live')) map3d.getSource('tour-live').setData({ type: 'FeatureCollection', features: [] });
         drawTrailStatic(tour.idx, true); // 抵達：當前腿完整入列，t-3 以前的不留
         openTourPopup(stopB); // 抵達：換下一張卡片並彈跳跳出
+        // 長距離腿的拉近移到抵達後停留期間播（行進中零暫停）；停留跟著加長，播完才推進下一腿
+        let dwellExtra = 0;
+        if (overview && isFollowOn() && stopB && stopB.lat != null) {
+          if (!cur3D) zoomInCam2D(stopB, durMs);
+          else zoomInCam3D(stopB, durMs);
+          dwellExtra = zoomInExtraMs(durMs);
+        }
         if (isFollowOn()) centerTourPopup(); // 抵達：移動地圖讓照片資訊置中（3D 為環繞運鏡）
-        scheduleNextLeg(dwellMs()); // 抵達驅動：停留展示後再推進下一腿（取代固定節拍）
+        scheduleNextLeg(dwellMs() + dwellExtra); // 抵達驅動：停留展示後再推進下一腿（取代固定節拍）
       };
       // 看門狗：動畫若意外中斷（無抵達），逾時自動推進一腿，避免播到一半卡死；
       // 健康的腿一定先抵達（抵達會清掉它改排停留），所以它幾乎不會開火。
