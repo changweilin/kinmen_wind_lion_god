@@ -1925,7 +1925,8 @@
         const H = wrap ? wrap.offsetHeight : 330;
         const mp = map.latLngToContainerPoint(stopLatLng);
         const popupCenter = mp.subtract(L.point(0, TRAIL_POPUP_TIP + H / 2));
-        map.panTo(map.containerPointToLatLng(popupCenter), { animate: true, duration: 0.8 });
+        // 單次連續運鏡：同 zoom 的 flyTo（ease 插值），避免 panTo/flyTo 打架造成瞬間跳轉
+        map.flyTo(map.containerPointToLatLng(popupCenter), map.getZoom(), { duration: 0.8 });
       });
     }
     function isFollowOn() {
@@ -1975,6 +1976,28 @@
         map.flyTo([stopB.lat, stopB.lng], Math.max(map.getZoom(), 15), { duration: dur });
       } catch (e) {}
     }
+    // 抵達單次連續運鏡（2D 長距離）：拉近＋資訊卡置中合併為一次 flyTo，
+    // 避免 zoomIn 與 centerTourPopup 兩次飛行互相中斷造成瞬間跳轉
+    function arrivalCam2D(stopB, durMs) {
+      try {
+        const targetZoom = Math.max(map.getZoom(), 15);
+        const dur = Math.min(1.8, Math.max(1.0, durMs / 1000 * 0.3));
+        camFlyStart(dur);
+        requestAnimationFrame(() => {
+          try {
+            const wrap = document.querySelector('.tour-popup .leaflet-popup-content-wrapper');
+            const H = wrap ? wrap.offsetHeight : 330;
+            const offY = TRAIL_POPUP_TIP + H / 2;
+            const stopPt = map.project(L.latLng(stopB.lat, stopB.lng), targetZoom);
+            const target = map.unproject(stopPt.subtract(L.point(0, offY)), targetZoom);
+            map.flyTo(target, targetZoom, { duration: dur });
+          } catch (e) {
+            map.flyTo([stopB.lat, stopB.lng], targetZoom, { duration: dur });
+          }
+        });
+      } catch (e) {}
+    }
+    function cinematicMs3D() { return Math.ceil(4400 / Math.sqrt(tour.speed || 1)); }
     function overviewCam3D(a, b) {
       try {
         const bb = new maplibregl.LngLatBounds([a.lng, a.lat], [a.lng, a.lat]);
@@ -2248,13 +2271,19 @@
         drawTrailStatic(tour.idx, true); // 抵達：當前腿完整入列，t-3 以前的不留
         openTourPopup(stopB); // 抵達：換下一張卡片並彈跳跳出
         // 長距離腿的拉近移到抵達後停留期間播（行進中零暫停）；停留跟著加長，播完才推進下一腿
+        // 抵達只做「一次」連續飛行：2D 長距離用 arrivalCam2D（拉近＋置中合一），
+        // 3D 只做 fly3DCinematic（經 centerTourPopup），不再另發 zoomIn 中斷它；
+        // 3D 環繞需播完才走，停留一律加長到環繞播完，避免下一腿起飛中斷造成跳轉
         let dwellExtra = 0;
-        if (overview && isFollowOn() && stopB && stopB.lat != null) {
-          if (!cur3D) zoomInCam2D(stopB, durMs);
-          else zoomInCam3D(stopB, durMs);
-          dwellExtra = zoomInExtraMs(durMs);
+        if (isFollowOn() && stopB && stopB.lat != null) {
+          if (!cur3D) {
+            if (overview) { arrivalCam2D(stopB, durMs); dwellExtra = zoomInExtraMs(durMs); }
+            else centerTourPopup();
+          } else {
+            centerTourPopup();
+            dwellExtra = cinematicMs3D() + 400;
+          }
         }
-        if (isFollowOn()) centerTourPopup(); // 抵達：移動地圖讓照片資訊置中（3D 為環繞運鏡）
         scheduleNextLeg(dwellMs() + dwellExtra); // 抵達驅動：停留展示後再推進下一腿（取代固定節拍）
       };
       // 看門狗：動畫若意外中斷（無抵達），逾時自動推進一腿，避免播到一半卡死；
